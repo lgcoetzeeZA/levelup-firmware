@@ -1,10 +1,6 @@
 {
   "version": "1.0.0",
   "files": {
-    "boot.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/boot.py",
-      "sha256": "16f5b4bcb120e9a032242b47967e649a0cc577b41939e81ef7d4b4da181bd17f"
-    },
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
       "sha256": "e673c212673c7d1b17c3e87e78483bc02ca1b9a3986b07e580c68a2c76bc1fa4"
@@ -31,11 +27,7 @@
     },
     "ota_updater.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
-      "sha256": "3bf6b922940d910d54e7a9ec7d0abaddd88118fcc397484f5fd6947e023c7081"
-    },
-    "relay_state.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/relay_state.py",
-      "sha256": "a01a152e8a369faf5ad273c191ffa206a2ca6386efa2b2c40f8c05b8cee171cf"
+      "sha256": "5beebd2abe133d6bc07fb565fca0e38714efc9cac9433a8454a5bd5aad1f9f26"
     },
     "reservoir_sensor.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/reservoir_sensor.py",
