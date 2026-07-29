@@ -75,7 +75,7 @@ def get_client_id(config):
     return client_id
 
 
-def make_on_message(state):
+def make_on_message(state, wdt):
     """Returns an MQTT message callback closed over shared loop state,
     so incoming commands (e.g. relay toggle) can update the relay pin."""
     def on_message(topic, msg):
@@ -91,7 +91,7 @@ def make_on_message(state):
             print("Relay toggled via MQTT ->", relay.value())
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
-            ota_updater.check_for_update(display=display)
+            ota_updater.check_for_update(display=display, wdt=wdt)
     return on_message
 
 
@@ -168,16 +168,16 @@ def run_app(config, wifi):
     topic_sub = "{}/{}/sub".format(client_id, MQTT_TOPIC_PREFIX)
     topic_relay = "{}/{}/relay".format(client_id, MQTT_TOPIC_PREFIX)
 
+    wdt = WDT(timeout=WDT_TIMEOUT_MS)
+
     state = {}
     mqtt = mqtt_handler.MQTTHandler(
         client_id=client_id,
         server=MQTT_BROKER,
         sub_topic=topic_sub,
-        on_message=make_on_message(state),
+        on_message=make_on_message(state, wdt),
         keepalive=60,
     )
-
-    wdt = WDT(timeout=WDT_TIMEOUT_MS)
 
     last_publish = time.time()
     last_relay_published = None
@@ -249,7 +249,7 @@ def run_app(config, wifi):
 
         if time.time() - last_ota_check >= OTA_CHECK_INTERVAL_SEC:
             print("Running scheduled OTA check...")
-            ota_updater.check_for_update(display=display)
+            ota_updater.check_for_update(display=display, wdt=wdt)
             last_ota_check = time.time()
 
         time.sleep(0.2)

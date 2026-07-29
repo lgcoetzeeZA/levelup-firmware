@@ -10,8 +10,8 @@ import gc
 VERSION_FILE = "firmware_version.txt"
 
 # Replace with your actual GitHub raw manifest URL once your repo is set up, e.g.:
-# "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/manifest.json"
-MANIFEST_URL = "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/manifest.json"
+# "https://raw.githubusercontent.com/<yourusername>/<yourrepo>/main/manifest.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/manifest.json"
 
 
 def get_current_version():
@@ -42,18 +42,25 @@ def _download(url):
     return data
 
 
-def check_for_update(display=None):
+def check_for_update(display=None, wdt=None):
     """Checks the manifest for a version different from the one currently
     installed. If found, downloads every listed file to a staging filename
     and verifies its sha256 hash. Only if EVERY file downloads and verifies
     cleanly does it swap them all into place and reboot - if anything fails
     at any point, the currently running files are left completely untouched.
 
+    wdt: optional active WDT instance, fed between each file so a batch of
+    many small downloads can't cumulatively exceed the watchdog timeout
+    even when no single request is actually hung.
+
     Returns True if an update was applied (device reboots as part of this),
     False if already up to date or the check/update failed."""
     gc.collect()
     current_version = get_current_version()
     print("Current firmware version:", current_version)
+
+    if wdt:
+        wdt.feed()
 
     try:
         manifest_resp = urequests.get(MANIFEST_URL)
@@ -81,11 +88,17 @@ def check_for_update(display=None):
     staged = []
     try:
         for filename, info in files.items():
+            if wdt:
+                wdt.feed()
+
             url = info["url"]
             expected_hash = info.get("sha256")
 
             print("Downloading", filename)
             data = _download(url)
+
+            if wdt:
+                wdt.feed()
 
             if expected_hash:
                 actual_hash = _sha256_hex(data)
@@ -109,6 +122,9 @@ def check_for_update(display=None):
         if display:
             display.show("Update Failed", "", "Keeping current", "version")
         return False
+
+    if wdt:
+        wdt.feed()
 
     print("All files downloaded and verified. Applying update...")
     if display:
