@@ -3,7 +3,7 @@
 Generates manifest.json for LevelUp OTA updates.
 
 Usage:
-    python3 generate_manifest.py --folder ./device_files --repo-base https://raw.githubusercontent.com/<user>/<repo>/main --version 1.0.1
+    python3 generate_manifest.py --folder ./device_files --repo-base https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main --version 1.0.1
 
 This scans the given folder for .py files, computes a sha256 hash for
 each, and writes a manifest.json ready to commit and push to your GitHub
@@ -32,7 +32,7 @@ def sha256_of_file(path):
 def main():
     parser = argparse.ArgumentParser(description="Generate manifest.json for LevelUp OTA updates")
     parser.add_argument("--folder", required=True, help="Folder containing the .py files to release")
-    parser.add_argument("--repo-base", required=True, help="Base raw GitHub URL, e.g. https://raw.githubusercontent.com/user/repo/main")
+    parser.add_argument("--repo-base", required=True, help="Base raw GitHub URL, e.g. https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main")
     parser.add_argument("--version", required=True, help="Version string for this release, e.g. 1.0.1")
     parser.add_argument("--output", default="manifest.json", help="Output path (default: manifest.json)")
     args = parser.parse_args()

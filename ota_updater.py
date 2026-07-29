@@ -10,8 +10,8 @@ import gc
 VERSION_FILE = "firmware_version.txt"
 
 # Replace with your actual GitHub raw manifest URL once your repo is set up, e.g.:
-# "https://raw.githubusercontent.com/<yourusername>/<yourrepo>/main/manifest.json"
-MANIFEST_URL = "https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/manifest.json"
+# "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/manifest.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/manifest.json"
 
 
 def get_current_version():

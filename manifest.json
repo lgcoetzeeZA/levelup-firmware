@@ -29,6 +29,10 @@
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
       "sha256": "5beebd2abe133d6bc07fb565fca0e38714efc9cac9433a8454a5bd5aad1f9f26"
     },
+    "relay_state.py": {
+      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/relay_state.py",
+      "sha256": "a01a152e8a369faf5ad273c191ffa206a2ca6386efa2b2c40f8c05b8cee171cf"
+    },
     "reservoir_sensor.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/reservoir_sensor.py",
       "sha256": "9bc429d1464661649bcb277d1d787f77fe66e3ce718aa2d8f01b18d5542a58a1"
