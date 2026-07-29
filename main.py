@@ -32,6 +32,7 @@ RIGHT_BUTTON_PIN = 4
 ADD_NETWORK_HOLD_MS = 5000
 LEFT_BUTTON_PIN = 12
 EDIT_TANK_HOLD_MS = 5000
+OTA_BUTTON_HOLD_MS = 3000
 DIP1_PIN = 14
 DIP2_PIN = 13
 GREEN_LED_PIN = 5
@@ -207,12 +208,20 @@ def run_app(config, wifi):
             setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
             return  # unreachable - portal loops until the device resets
 
-        if left_button.check_hold(EDIT_TANK_HOLD_MS):
-            print("Entering tank settings edit mode via button hold")
-            display.show("Edit Tank", "", "Starting server...")
-            time.sleep(1)
-            setup_portal.run_edit_tank_server(wdt=wdt)
-            return  # unreachable - server loops until the device resets
+        if dip1.value() == 1:
+            if left_button.check_hold(OTA_BUTTON_HOLD_MS):
+                print("Checking for firmware update via button (dip1 armed)")
+                display.show("Checking for", "Update...", "", "")
+                ota_updater.check_for_update(display=display, wdt=wdt)
+                display.show("Check Complete", "", "", "")
+                time.sleep(2)
+        else:
+            if left_button.check_hold(EDIT_TANK_HOLD_MS):
+                print("Entering tank settings edit mode via button hold")
+                display.show("Edit Tank", "", "Starting server...")
+                time.sleep(1)
+                setup_portal.run_edit_tank_server(wdt=wdt)
+                return  # unreachable - server loops until the device resets
 
         if relay.value() != last_relay_published:
             payload = b"relayOn" if relay.value() else b"relayOff"

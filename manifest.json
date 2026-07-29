@@ -19,7 +19,7 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "dcb3067e204ec0a8ddec33cfb1a52ff65c2fbae6bad2e0863b6f15565a6d6707"
+      "sha256": "2bb0624d10fc76c535bdb528273c788dabd2adb53dcac74bfbcd220c25cfd77a"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
@@ -27,7 +27,7 @@
     },
     "ota_updater.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
-      "sha256": "8e9110be1655e066f1532a14c9dcd3fb8111ab032cc69c798783538e252122ca"
+      "sha256": "38d4b069c26e698a584b967f5116fa1ca19dc4034e25cee4ccc0e58f10d85d83"
     },
     "relay_state.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/relay_state.py",
