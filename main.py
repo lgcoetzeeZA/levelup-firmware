@@ -153,6 +153,7 @@ def build_status_payload(wifi, reading, relay_state):
         "sensorStatus": reading["status"],
         "distanceCm": reading["distance_cm"],
         "consecutiveFailures": reading["consecutive_failures"],
+        "secondsSinceGoodReading": reading.get("seconds_since_good"),
         "tankPercent": level.get("percent"),
         "tankAvailableLiters": level.get("available_liters"),
         "tankCapacityLiters": level.get("capacity_liters"),

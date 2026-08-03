@@ -21,6 +21,10 @@ SAMPLE_COUNT = 5             # readings taken per measurement cycle
 SAMPLE_DELAY_MS = 20         # gap between samples within one cycle
 ERROR_THRESHOLD = 10         # consecutive failed cycles before "error" (vs "stale")
 SMOOTHING_ALPHA = 0.3        # cross-cycle smoothing - lower = smoother but slower to react
+MAX_STALE_SECONDS = 300      # force "error" if no good reading in this long, even if
+                              # consecutive_failures hasn't hit ERROR_THRESHOLD (e.g. the
+                              # sensor is intermittently succeeding just often enough to
+                              # keep resetting that counter without ever being reliable)
 
 _dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
 _dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
@@ -55,6 +59,7 @@ _sensor = ultrasonic_sensor.UltrasonicSensor(TRIG_PIN, ECHO_PIN, timeout_us=3000
 
 _last_good_distance = None
 _last_good_level = None
+_last_good_time = None
 _consecutive_failures = 0
 _smoothed_distance = None
 
@@ -108,7 +113,7 @@ def read(config):
       level                 - tank_calculator.calculate_level() dict, or None
                                if there has never been a good reading
     """
-    global _last_good_distance, _last_good_level, _consecutive_failures, _smoothed_distance
+    global _last_good_distance, _last_good_level, _last_good_time, _consecutive_failures, _smoothed_distance
 
     distance = _sample_distance()
 
@@ -125,12 +130,14 @@ def read(config):
 
         _consecutive_failures = 0
         _last_good_distance = _smoothed_distance
+        _last_good_time = time.time()
         level = tank_calculator.calculate_level(_smoothed_distance, config)
         _last_good_level = level
         return {
             "status": "ok",
             "distance_cm": round(_smoothed_distance, 1),
             "consecutive_failures": 0,
+            "seconds_since_good": 0,
             "level": level,
         }
 
@@ -141,14 +148,21 @@ def read(config):
             "status": "error",
             "distance_cm": None,
             "consecutive_failures": _consecutive_failures,
+            "seconds_since_good": None,
             "level": None,
         }
 
-    status = "error" if _consecutive_failures >= ERROR_THRESHOLD else "stale"
+    seconds_since_good = time.time() - _last_good_time
+
+    if _consecutive_failures >= ERROR_THRESHOLD or seconds_since_good >= MAX_STALE_SECONDS:
+        status = "error"
+    else:
+        status = "stale"
 
     return {
         "status": status,
         "distance_cm": round(_last_good_distance, 1),
         "consecutive_failures": _consecutive_failures,
+        "seconds_since_good": seconds_since_good,
         "level": _last_good_level,
     }

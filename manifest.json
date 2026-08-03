@@ -1,5 +1,5 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.8",
   "files": {
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
@@ -19,7 +19,7 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "cecce2c862c41040949aee97c7ca92ed5fca9dd7fff5f586d7c179522abab3de"
+      "sha256": "bae1f164d81959ca1da1358915390dcde53edd2ee85051bf6522c4ee05a2b611"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
@@ -35,7 +35,7 @@
     },
     "reservoir_sensor.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/reservoir_sensor.py",
-      "sha256": "a847046a5caa0728f83cbae772a572b4cd5dd45b912891e33fbbed443b069e9e"
+      "sha256": "65d9e60a40e0b20db3e3c2067b91c05a265c9e996b9d318de2885ae1a0a762b1"
     },
     "rgb_led.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/rgb_led.py",
