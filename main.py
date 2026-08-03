@@ -140,7 +140,7 @@ def rssi_to_percent(rssi):
     return int(2 * (rssi + 100))
 
 
-def build_status_payload(wifi, reading, relay_state):
+def build_status_payload(wifi, reading, relay_state, config):
     now = time.localtime()
     timestamp = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
         now[0], now[1], now[2], now[3], now[4], now[5]
@@ -157,6 +157,9 @@ def build_status_payload(wifi, reading, relay_state):
         "tankPercent": level.get("percent"),
         "tankAvailableLiters": level.get("available_liters"),
         "tankCapacityLiters": level.get("capacity_liters"),
+        "tankHeightCm": config.get("tank_height"),
+        "tankDiameterCm": config.get("tank_diameter"),
+        "sensorOffsetCm": config.get("sensor_offset_cm"),
         "relayStatus": int(relay_state),
         "dip1": dip1.value(),
         "dip2": dip2.value(),
@@ -272,7 +275,7 @@ def run_app(config, wifi):
             if rgb:
                 rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
 
-            payload = build_status_payload(wifi, reading, relay.value())
+            payload = build_status_payload(wifi, reading, relay.value(), config)
             published = mqtt.publish_json(topic_pub, payload)
 
             if not wifi.isconnected():

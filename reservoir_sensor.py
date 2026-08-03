@@ -25,6 +25,10 @@ MAX_STALE_SECONDS = 300      # force "error" if no good reading in this long, ev
                               # consecutive_failures hasn't hit ERROR_THRESHOLD (e.g. the
                               # sensor is intermittently succeeding just often enough to
                               # keep resetting that counter without ever being reliable)
+MAX_CHANGE_CM_PER_CYCLE = 15  # reject a reading that implies the water level jumped by
+                               # more than this between cycles (~5s apart) - catches a
+                               # persistent false echo that fools the within-cycle median,
+                               # since a real reservoir can't physically move this fast
 
 _dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
 _dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
@@ -116,6 +120,14 @@ def read(config):
     global _last_good_distance, _last_good_level, _last_good_time, _consecutive_failures, _smoothed_distance
 
     distance = _sample_distance()
+
+    if distance is not None and _last_good_distance is not None:
+        implied_change = abs(distance - _last_good_distance)
+        if implied_change > MAX_CHANGE_CM_PER_CYCLE:
+            print("Rejecting implausible reading: {}cm (previous good: {}cm, jump: {}cm)".format(
+                distance, round(_last_good_distance, 1), round(implied_change, 1)
+            ))
+            distance = None
 
     if distance is not None:
         if _consecutive_failures >= ERROR_THRESHOLD:
