@@ -89,6 +89,11 @@ def make_on_message(state, wdt, ota_progress, config):
             set_relay(not relay.value())
             print("Relay toggled via MQTT ->", relay.value())
             ota_progress("Relay toggled via MQTT -> {}".format("ON" if relay.value() else "OFF"))
+        elif msg in (b"rebootDevice", b"restartDevice"):
+            print("Reboot requested via MQTT")
+            ota_progress("Rebooting device now...")
+            time.sleep(1)
+            machine.reset()
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
             ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
