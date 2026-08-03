@@ -35,7 +35,9 @@ def calculate_level(distance_cm, config):
     """
     distance_cm: measured distance from the sensor (mounted at the top,
                  facing down) to the water surface.
-    config: dict with tank_height, tank_diameter, tank_liters (rated capacity).
+    config: dict with tank_height, tank_diameter, tank_liters (rated capacity),
+            and sensor_offset_cm (gap between the sensor and the true full/
+            overflow line - 0 if the sensor sits flush at the top).
 
     Returns a dict, or None if the config/reading isn't usable:
       percent                    - fill percentage (0-100), from geometry + sensor
@@ -47,6 +49,7 @@ def calculate_level(distance_cm, config):
     height = config.get("tank_height", 0)
     diameter = config.get("tank_diameter", 0)
     rated_capacity = config.get("tank_liters", 0)
+    sensor_offset = config.get("sensor_offset_cm", 0)
 
     if height <= 0 or diameter <= 0:
         return None
@@ -54,7 +57,12 @@ def calculate_level(distance_cm, config):
     if distance_cm is None:
         return None
 
-    water_height_cm = height - distance_cm
+    # Total distance the sensor sees when the tank is completely empty:
+    # the tank's own height, plus however far the sensor is mounted above
+    # the true full/overflow line.
+    full_span_cm = height + sensor_offset
+
+    water_height_cm = full_span_cm - distance_cm
     # Clamp - a sensor glitch shouldn't report negative water or an overflow
     if water_height_cm < 0:
         water_height_cm = 0

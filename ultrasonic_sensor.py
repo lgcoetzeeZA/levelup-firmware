@@ -4,10 +4,11 @@ import time
 
 
 class UltrasonicSensor:
-    def __init__(self, trig_pin, echo_pin, timeout_us=30000, max_plausible_cm=500):
+    def __init__(self, trig_pin, echo_pin, timeout_us=30000, min_plausible_cm=21, max_plausible_cm=450):
         self.trig = Pin(trig_pin, Pin.OUT)
         self.echo = Pin(echo_pin, Pin.IN)
         self.timeout_us = timeout_us
+        self.min_plausible_cm = min_plausible_cm
         self.max_plausible_cm = max_plausible_cm
         self.trig.value(0)
 
@@ -30,7 +31,7 @@ class UltrasonicSensor:
 
         distance_cm = duration / 58.0
 
-        if distance_cm <= 0 or distance_cm > self.max_plausible_cm:
-            return None  # implausible - sensor glitch or nothing in range
+        if distance_cm < self.min_plausible_cm or distance_cm > self.max_plausible_cm:
+            return None  # below the sensor's blind zone, or beyond its rated range
 
         return distance_cm

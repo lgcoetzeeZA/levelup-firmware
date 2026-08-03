@@ -1,19 +1,67 @@
 import time
+from machine import Pin
 import ultrasonic_sensor
 import tank_calculator
 
 TRIG_PIN = 26
 ECHO_PIN = 27
 
+DIP1_PIN = 14
+DIP2_PIN = 13
+
+# Standard/previous ultrasonic sensor (e.g. HC-SR04-style) plausible range
+STANDARD_SENSOR_MIN_CM = 2
+STANDARD_SENSOR_MAX_CM = 400
+
+# AJ-SR04M (waterproof) - measured blind zone and datasheet max range
+AJ_SR04M_MIN_CM = 21
+AJ_SR04M_MAX_CM = 450
+
 SAMPLE_COUNT = 5             # readings taken per measurement cycle
 SAMPLE_DELAY_MS = 20         # gap between samples within one cycle
 ERROR_THRESHOLD = 10         # consecutive failed cycles before "error" (vs "stale")
+SMOOTHING_ALPHA = 0.3        # cross-cycle smoothing - lower = smoother but slower to react
 
-_sensor = ultrasonic_sensor.UltrasonicSensor(TRIG_PIN, ECHO_PIN, timeout_us=30000)
+_dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
+_dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
+
+
+def _select_sensor_range():
+    """Reads the dip switches once at boot to determine which sensor is
+    fitted:
+      1 ON  + 2 ON  -> AJ-SR04M (waterproof)
+      1 OFF + 2 OFF -> standard/previous sensor
+      any other combo -> falls back to the standard sensor range, since
+      1 ON + 2 OFF is reserved for arming the Left button's OTA shortcut,
+      not a sensor selection."""
+    d1 = _dip1.value()
+    d2 = _dip2.value()
+
+    if d1 == 1 and d2 == 1:
+        print("Sensor type: AJ-SR04M (waterproof) - dip switches 1+2 ON")
+        return "AJ-SR04M", AJ_SR04M_MIN_CM, AJ_SR04M_MAX_CM
+
+    if d1 == 0 and d2 == 0:
+        print("Sensor type: standard sensor - dip switches 1+2 OFF")
+        return "Standard", STANDARD_SENSOR_MIN_CM, STANDARD_SENSOR_MAX_CM
+
+    print("Dip switches don't match a defined sensor combo - defaulting to standard sensor range")
+    return "Standard", STANDARD_SENSOR_MIN_CM, STANDARD_SENSOR_MAX_CM
+
+
+_sensor_type_label, _min_cm, _max_cm = _select_sensor_range()
+_sensor = ultrasonic_sensor.UltrasonicSensor(TRIG_PIN, ECHO_PIN, timeout_us=30000,
+                                              min_plausible_cm=_min_cm, max_plausible_cm=_max_cm)
 
 _last_good_distance = None
 _last_good_level = None
 _consecutive_failures = 0
+_smoothed_distance = None
+
+
+def get_sensor_type():
+    """Returns the sensor type label selected at boot, e.g. for MQTT visibility."""
+    return _sensor_type_label
 
 
 def _median(values):
@@ -60,18 +108,28 @@ def read(config):
       level                 - tank_calculator.calculate_level() dict, or None
                                if there has never been a good reading
     """
-    global _last_good_distance, _last_good_level, _consecutive_failures
+    global _last_good_distance, _last_good_level, _consecutive_failures, _smoothed_distance
 
     distance = _sample_distance()
 
     if distance is not None:
+        if _consecutive_failures >= ERROR_THRESHOLD:
+            # Sensor was in a hard error state for a while - don't blend this
+            # recovery reading with a now-stale anchor, just start fresh.
+            _smoothed_distance = None
+
+        if _smoothed_distance is None:
+            _smoothed_distance = distance
+        else:
+            _smoothed_distance = SMOOTHING_ALPHA * distance + (1 - SMOOTHING_ALPHA) * _smoothed_distance
+
         _consecutive_failures = 0
-        _last_good_distance = distance
-        level = tank_calculator.calculate_level(distance, config)
+        _last_good_distance = _smoothed_distance
+        level = tank_calculator.calculate_level(_smoothed_distance, config)
         _last_good_level = level
         return {
             "status": "ok",
-            "distance_cm": round(distance, 1),
+            "distance_cm": round(_smoothed_distance, 1),
             "consecutive_failures": 0,
             "level": level,
         }

@@ -132,6 +132,8 @@ def _render_full_setup_page(scanned_networks, error=None):
 <input type="number" step="any" name="height" required>
 <label>Tank Diameter (cm)</label>
 <input type="number" step="any" name="diameter" required>
+<label>Sensor Height Above Full Water Line (cm)</label>
+<input type="number" step="any" name="sensor_offset" placeholder="Leave blank if sensor sits flush at the top">
 <label>MQTT Client ID (optional)</label>
 <input type="text" name="mqtt_client_id" placeholder="Leave blank for auto-generated ID">
 <button type="submit">Save &amp; Connect</button>
@@ -217,6 +219,8 @@ def _render_edit_tank_page(config, error=None):
 <input type="number" step="any" name="height" value="{height}" required>
 <label>Tank Diameter (cm)</label>
 <input type="number" step="any" name="diameter" value="{diameter}" required>
+<label>Sensor Height Above Full Water Line (cm)</label>
+<input type="number" step="any" name="sensor_offset" value="{sensor_offset}">
 <button type="submit">Save</button>
 </form>
 """.format(
@@ -224,6 +228,7 @@ def _render_edit_tank_page(config, error=None):
         liters=config.get("tank_liters", 0),
         height=config.get("tank_height", 0),
         diameter=config.get("tank_diameter", 0),
+        sensor_offset=config.get("sensor_offset_cm", 0),
     )
 
     return _page_shell("Edit Tank Settings", body)
@@ -234,6 +239,8 @@ def _handle_edit_tank_post(fields):
         liters = float(fields.get("liters", 0))
         height = float(fields.get("height", 0))
         diameter = float(fields.get("diameter", 0))
+        offset_raw = fields.get("sensor_offset", "").strip()
+        sensor_offset = float(offset_raw) if offset_raw else 0.0
 
         if height <= 0 or diameter <= 0:
             raise ValueError("missing required field")
@@ -242,6 +249,7 @@ def _handle_edit_tank_post(fields):
         config["tank_liters"] = liters
         config["tank_height"] = height
         config["tank_diameter"] = diameter
+        config["sensor_offset_cm"] = sensor_offset
         save_config(config)
 
         status_led.set_status(status_led.STATUS_SAVED)
@@ -274,6 +282,8 @@ def _handle_full_setup_post(fields, scanned_networks):
         liters = float(fields.get("liters", 0))
         height = float(fields.get("height", 0))
         diameter = float(fields.get("diameter", 0))
+        offset_raw = fields.get("sensor_offset", "").strip()
+        sensor_offset = float(offset_raw) if offset_raw else 0.0
 
         if not ssid or height <= 0 or diameter <= 0:
             raise ValueError("missing required field")
@@ -298,6 +308,7 @@ def _handle_full_setup_post(fields, scanned_networks):
         config["tank_liters"] = liters
         config["tank_height"] = height
         config["tank_diameter"] = diameter
+        config["sensor_offset_cm"] = sensor_offset
         config["mqtt_client_id"] = fields.get("mqtt_client_id", "").strip()
         save_config(config)
 
@@ -355,16 +366,69 @@ def _handle_add_network_post(fields, scanned_networks):
         ), False
 
 
+def _read_full_request(client, max_bytes=8192):
+    """Reads a complete HTTP request from the socket, looping until the
+    full body has arrived (per Content-Length) rather than assuming a
+    single recv() call captures everything - a request can legitimately
+    arrive across multiple TCP packets, especially once the body is more
+    than a few dozen bytes."""
+    try:
+        client.settimeout(3)
+    except OSError:
+        pass
+
+    buffer = b""
+    header_end = -1
+
+    while header_end == -1:
+        try:
+            chunk = client.recv(1024)
+        except OSError:
+            break
+        if not chunk:
+            break
+        buffer += chunk
+        header_end = buffer.find(b"\r\n\r\n")
+        if len(buffer) > max_bytes:
+            break
+
+    if header_end == -1:
+        return buffer.decode("utf-8", "ignore")
+
+    headers_part = buffer[:header_end].decode("utf-8", "ignore")
+    body_so_far = buffer[header_end + 4:]
+
+    content_length = 0
+    for line in headers_part.split("\r\n"):
+        if line.lower().startswith("content-length:"):
+            try:
+                content_length = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                content_length = 0
+            break
+
+    while len(body_so_far) < content_length and len(body_so_far) < max_bytes:
+        try:
+            chunk = client.recv(1024)
+        except OSError:
+            break
+        if not chunk:
+            break
+        body_so_far += chunk
+
+    return headers_part + "\r\n\r\n" + body_so_far.decode("utf-8", "ignore")
+
+
 def _handle_request(client, mode, scanned_networks):
     try:
-        request = client.recv(2048)
-        request = request.decode("utf-8")
+        request = _read_full_request(client)
 
         header_end = request.find("\r\n\r\n")
         body = request[header_end + 4:] if header_end != -1 else ""
 
         if request.startswith("POST"):
             fields = _parse_form(body)
+            print("POST fields received:", fields)
             if mode == "add_network":
                 page, success = _handle_add_network_post(fields, scanned_networks)
             elif mode == "edit_tank":

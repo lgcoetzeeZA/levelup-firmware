@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "tank_liters": 0,
     "tank_height": 0,
     "tank_diameter": 0,
+    "sensor_offset_cm": 0,     # gap between sensor and the true full/overflow line
     "mqtt_client_id": ""
 }
 

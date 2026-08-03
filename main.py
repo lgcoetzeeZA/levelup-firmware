@@ -14,7 +14,6 @@ import mqtt_handler
 import buttons
 import relay_state
 import rgb_led
-import indicator_led
 import ota_updater
 
 # ---------------------------------------------------------------------------
@@ -35,7 +34,6 @@ EDIT_TANK_HOLD_MS = 5000
 OTA_BUTTON_HOLD_MS = 3000
 DIP1_PIN = 14
 DIP2_PIN = 13
-GREEN_LED_PIN = 5
 RGB_RED_PIN = 32
 RGB_GREEN_PIN = 25
 RGB_BLUE_PIN = 33
@@ -48,8 +46,6 @@ RGB_LED_ENABLED = True
 relay = Pin(RELAY_PIN, Pin.OUT)
 relay.value(relay_state.load_relay_state())
 print("Relay resumed to saved state:", relay.value())
-
-green_led = indicator_led.IndicatorLED(GREEN_LED_PIN)
 
 rgb = rgb_led.RGBLed(RGB_RED_PIN, RGB_GREEN_PIN, RGB_BLUE_PIN) if RGB_LED_ENABLED else None
 
@@ -118,6 +114,7 @@ def build_status_payload(wifi, reading, relay_state):
     level = reading["level"] or {}
 
     return {
+        "sensorType": reservoir_sensor.get_sensor_type(),
         "sensorStatus": reading["status"],
         "distanceCm": reading["distance_cm"],
         "consecutiveFailures": reading["consecutive_failures"],
@@ -208,7 +205,7 @@ def run_app(config, wifi):
             setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
             return  # unreachable - portal loops until the device resets
 
-        if dip1.value() == 1:
+        if dip1.value() == 1 and dip2.value() == 0:
             if left_button.check_hold(OTA_BUTTON_HOLD_MS):
                 print("Checking for firmware update via button (dip1 armed)")
                 display.show("Checking for", "Update...", "", "")
@@ -234,13 +231,6 @@ def run_app(config, wifi):
             update_display(reading, mqtt.connected)
             if rgb:
                 rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
-
-            if reading["status"] != "ok":
-                green_led.set_mode(indicator_led.OFF)
-            elif reading["level"]["percent"] > 20:
-                green_led.set_mode(indicator_led.ON)
-            else:
-                green_led.set_mode(indicator_led.BLINK)
 
             payload = build_status_payload(wifi, reading, relay.value())
             published = mqtt.publish_json(topic_pub, payload)
