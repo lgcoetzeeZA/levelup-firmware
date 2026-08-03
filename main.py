@@ -72,7 +72,7 @@ def get_client_id(config):
     return client_id
 
 
-def make_on_message(state, wdt):
+def make_on_message(state, wdt, ota_progress):
     """Returns an MQTT message callback closed over shared loop state,
     so incoming commands (e.g. relay toggle) can update the relay pin."""
     def on_message(topic, msg):
@@ -88,7 +88,7 @@ def make_on_message(state, wdt):
             print("Relay toggled via MQTT ->", relay.value())
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
-            ota_updater.check_for_update(display=display, wdt=wdt)
+            ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
     return on_message
 
 
@@ -165,15 +165,19 @@ def run_app(config, wifi):
     topic_pub = "{}/{}/pub".format(client_id, MQTT_TOPIC_PREFIX)
     topic_sub = "{}/{}/sub".format(client_id, MQTT_TOPIC_PREFIX)
     topic_relay = "{}/{}/relay".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_ota = "{}/{}/ota".format(client_id, MQTT_TOPIC_PREFIX)
 
     wdt = WDT(timeout=WDT_TIMEOUT_MS)
+
+    def ota_progress(message):
+        mqtt.publish_raw(topic_ota, message)
 
     state = {}
     mqtt = mqtt_handler.MQTTHandler(
         client_id=client_id,
         server=MQTT_BROKER,
         sub_topic=topic_sub,
-        on_message=make_on_message(state, wdt),
+        on_message=make_on_message(state, wdt, ota_progress),
         keepalive=60,
     )
 
@@ -209,7 +213,7 @@ def run_app(config, wifi):
             if left_button.check_hold(OTA_BUTTON_HOLD_MS):
                 print("Checking for firmware update via button (dip1 armed)")
                 display.show("Checking for", "Update...", "", "")
-                ota_updater.check_for_update(display=display, wdt=wdt)
+                ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
                 display.show("Check Complete", "", "", "")
                 time.sleep(2)
         else:
@@ -248,7 +252,7 @@ def run_app(config, wifi):
 
         if time.time() - last_ota_check >= OTA_CHECK_INTERVAL_SEC:
             print("Running scheduled OTA check...")
-            ota_updater.check_for_update(display=display, wdt=wdt)
+            ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
             last_ota_check = time.time()
 
         time.sleep(0.2)

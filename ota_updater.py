@@ -42,7 +42,7 @@ def _download(url):
     return data
 
 
-def check_for_update(display=None, wdt=None):
+def check_for_update(display=None, wdt=None, on_progress=None):
     """Checks the manifest for a version different from the one currently
     installed. If found, downloads every listed file to a staging filename
     and verifies its sha256 hash. Only if EVERY file downloads and verifies
@@ -53,11 +53,21 @@ def check_for_update(display=None, wdt=None):
     many small downloads can't cumulatively exceed the watchdog timeout
     even when no single request is actually hung.
 
+    on_progress: optional callback(message) - called with a short plain
+    text status at each stage, e.g. for publishing progress over MQTT.
+
     Returns True if an update was applied (device reboots as part of this),
     False if already up to date or the check/update failed."""
+
+    def _progress(msg):
+        print(msg)
+        if on_progress:
+            on_progress(msg)
+
     gc.collect()
     current_version = get_current_version()
     print("Current firmware version:", current_version)
+    _progress("Checking for update (current: v{})...".format(current_version))
 
     if wdt:
         wdt.feed()
@@ -68,6 +78,7 @@ def check_for_update(display=None, wdt=None):
         manifest_resp.close()
     except (OSError, ValueError) as e:
         print("OTA check failed - could not fetch manifest:", e)
+        _progress("Update check failed - could not reach update server")
         return False
 
     remote_version = manifest.get("version", "")
@@ -75,13 +86,16 @@ def check_for_update(display=None, wdt=None):
 
     if not remote_version or not files:
         print("OTA manifest is missing version or files.")
+        _progress("Update check failed - manifest was invalid")
         return False
 
     if remote_version == current_version:
         print("Already up to date.")
+        _progress("Already up to date (v{})".format(current_version))
         return False
 
     print("New version available: {} -> {}".format(current_version, remote_version))
+    _progress("Update found: v{} (current: v{})".format(remote_version, current_version))
     if display:
         display.show("Update Found", "", "v" + remote_version, "Downloading...")
 
@@ -95,6 +109,7 @@ def check_for_update(display=None, wdt=None):
             expected_hash = info.get("sha256")
 
             print("Downloading", filename)
+            _progress("Downloading: {}".format(filename))
             data = _download(url)
 
             if wdt:
@@ -114,6 +129,7 @@ def check_for_update(display=None, wdt=None):
 
     except (OSError, ValueError, KeyError) as e:
         print("OTA update failed during download - leaving current files untouched:", e)
+        _progress("Update failed ({}) - keeping current version v{}".format(e, current_version))
         for staging_name, _ in staged:
             try:
                 os.remove(staging_name)
@@ -127,6 +143,7 @@ def check_for_update(display=None, wdt=None):
         wdt.feed()
 
     print("All files downloaded and verified. Applying update...")
+    _progress("All {} file(s) verified. Applying update...".format(len(staged)))
     if display:
         display.show("Applying Update", "", "Do not power off...")
 
@@ -139,6 +156,7 @@ def check_for_update(display=None, wdt=None):
 
     _set_current_version(remote_version)
     print("Update applied. Restarting...")
+    _progress("Update complete - now v{}. Restarting...".format(remote_version))
     if display:
         display.show("Update Complete", "", "v" + remote_version, "Restarting...")
 
