@@ -80,12 +80,15 @@ def make_on_message(state, wdt, ota_progress, config):
         if msg == b"relayOn":
             set_relay(1)
             print("Relay set ON via MQTT")
+            ota_progress("Relay set ON via MQTT")
         elif msg == b"relayOff":
             set_relay(0)
             print("Relay set OFF via MQTT")
+            ota_progress("Relay set OFF via MQTT")
         elif msg in (b"RelayToggle", b"startRelay"):
             set_relay(not relay.value())
             print("Relay toggled via MQTT ->", relay.value())
+            ota_progress("Relay toggled via MQTT -> {}".format("ON" if relay.value() else "OFF"))
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
             ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
@@ -109,9 +112,13 @@ def make_on_message(state, wdt, ota_progress, config):
                     ))
                 else:
                     print("Unknown JSON command:", cmd)
+                    ota_progress("Unknown command: {}".format(cmd.get("cmd", "?")))
             except (ValueError, KeyError, TypeError) as e:
                 print("Failed to parse JSON command:", e)
                 ota_progress("Command failed - check JSON format")
+        else:
+            print("Unrecognized command:", msg)
+            ota_progress("Unrecognized command: {}".format(msg))
     return on_message
 
 

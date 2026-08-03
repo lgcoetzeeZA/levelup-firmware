@@ -19,7 +19,7 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "107676704b988036688948acc739562122fcaf2c54aa080fbf0140287927fa1a"
+      "sha256": "9de83ed0b1f5af391a33b5c5685655d006a75bb8f158685876ba929a5897c21b"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
