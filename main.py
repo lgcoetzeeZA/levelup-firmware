@@ -4,7 +4,7 @@ import ubinascii
 import machine
 from machine import Pin, WDT
 
-from config_manager import load_config, is_configured
+from config_manager import load_config, save_config, is_configured
 import wifi_manager
 import setup_portal
 import status_led
@@ -72,7 +72,7 @@ def get_client_id(config):
     return client_id
 
 
-def make_on_message(state, wdt, ota_progress):
+def make_on_message(state, wdt, ota_progress, config):
     """Returns an MQTT message callback closed over shared loop state,
     so incoming commands (e.g. relay toggle) can update the relay pin."""
     def on_message(topic, msg):
@@ -89,6 +89,29 @@ def make_on_message(state, wdt, ota_progress):
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
             ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
+        elif msg.startswith(b"{"):
+            try:
+                cmd = ujson.loads(msg)
+                if cmd.get("cmd") == "setTank":
+                    if "liters" in cmd:
+                        config["tank_liters"] = float(cmd["liters"])
+                    if "height" in cmd:
+                        config["tank_height"] = float(cmd["height"])
+                    if "diameter" in cmd:
+                        config["tank_diameter"] = float(cmd["diameter"])
+                    if "sensor_offset" in cmd:
+                        config["sensor_offset_cm"] = float(cmd["sensor_offset"])
+                    save_config(config)
+                    print("Tank settings updated via MQTT:", config)
+                    ota_progress("Tank settings updated: height={} diameter={} offset={} liters={}".format(
+                        config["tank_height"], config["tank_diameter"],
+                        config["sensor_offset_cm"], config["tank_liters"]
+                    ))
+                else:
+                    print("Unknown JSON command:", cmd)
+            except (ValueError, KeyError, TypeError) as e:
+                print("Failed to parse JSON command:", e)
+                ota_progress("Command failed - check JSON format")
     return on_message
 
 
@@ -177,7 +200,7 @@ def run_app(config, wifi):
         client_id=client_id,
         server=MQTT_BROKER,
         sub_topic=topic_sub,
-        on_message=make_on_message(state, wdt, ota_progress),
+        on_message=make_on_message(state, wdt, ota_progress, config),
         keepalive=60,
     )
 

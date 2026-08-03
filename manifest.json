@@ -1,5 +1,5 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "files": {
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
@@ -19,7 +19,7 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "246ebfa3bf300dc72dc4562c51bd1123b364c95e18fca4e31d54878ebdc7a93a"
+      "sha256": "107676704b988036688948acc739562122fcaf2c54aa080fbf0140287927fa1a"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
