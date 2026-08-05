@@ -173,28 +173,17 @@ def build_status_payload(wifi, reading, relay_state, config):
     }
 
 
-def update_display(reading, mqtt_connected):
+def update_display(reading, mqtt_connected, wifi_signal_percent, relay_on):
     level = reading["level"]
-    lines = []
+    percent = level["percent"] if level else None
+    available = level["available_liters"] if level else None
+    capacity = level["capacity_liters"] if level else None
 
-    if reading["status"] == "ok":
-        lines.append("Tank: {}%".format(level["percent"]))
-        lines.append("{} / {} L".format(level["available_liters"], level["capacity_liters"]))
-    elif level:
-        lines.append("Tank: {}%".format(level["percent"]))
-        lines.append("(last reading)")
-    else:
-        lines.append("No tank reading yet")
-
-    if reading["status"] == "stale":
-        lines.append("Sensor Error")
-    elif reading["status"] == "error":
-        lines.append("SENSOR ERROR")
-
-    if not mqtt_connected:
-        lines.append("MQTT Offline")
-
-    display.show(*lines[:5])
+    display.show_dashboard(
+        percent, available, capacity,
+        wifi_signal_percent, mqtt_connected,
+        reading["status"], relay_on
+    )
 
 
 def run_app(config, wifi):
@@ -271,7 +260,8 @@ def run_app(config, wifi):
 
         if time.time() - last_publish >= PUBLISH_INTERVAL_SEC:
             reading = reservoir_sensor.read(config)
-            update_display(reading, mqtt.connected)
+            wifi_signal_pct = rssi_to_percent(wifi.status("rssi")) if wifi else None
+            update_display(reading, mqtt.connected, wifi_signal_pct, bool(relay.value()))
             if rgb:
                 rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
 
