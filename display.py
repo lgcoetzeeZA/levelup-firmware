@@ -37,10 +37,11 @@ def show(*lines):
             _oled.text(str(line), 0, y)
             y += 10
         _oled.show()
-    except OSError:
-        # Screen may have been unplugged mid-run - fail silently rather
-        # than crashing the whole device over a display glitch.
-        pass
+    except Exception as e:
+        # Screen may have been unplugged mid-run, or hit a driver quirk -
+        # fail silently rather than crashing the whole device over a
+        # display glitch.
+        print("Display show() error (skipping this update):", e)
 
 
 def clear():
@@ -51,6 +52,43 @@ def clear():
         _oled.show()
     except OSError:
         pass
+
+
+def _fill_rect(x, y, w, h):
+    for dy in range(h):
+        for dx in range(w):
+            _oled.pixel(x + dx, y + dy, 1)
+
+
+def _rect_outline(x, y, w, h):
+    for dx in range(w):
+        _oled.pixel(x + dx, y, 1)
+        _oled.pixel(x + dx, y + h - 1, 1)
+    for dy in range(h):
+        _oled.pixel(x, y + dy, 1)
+        _oled.pixel(x + w - 1, y + dy, 1)
+
+
+def _line(x0, y0, x1, y1):
+    """Bresenham's line algorithm, using only pixel() - the one drawing
+    primitive virtually every SSD1306 driver variant implements."""
+    dx = abs(x1 - x0)
+    dy = -abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx + dy
+    x, y = x0, y0
+    while True:
+        _oled.pixel(x, y, 1)
+        if x == x1 and y == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x += sx
+        if e2 <= dx:
+            err += dx
+            y += sy
 
 
 def _scaled_text(text, x, y, scale):
@@ -70,7 +108,7 @@ def _scaled_text(text, x, y, scale):
     for ty in range(h):
         for tx in range(w):
             if fbuf.pixel(tx, ty):
-                _oled.fill_rect(x + tx * scale, y + ty * scale, scale, scale, 1)
+                _fill_rect(x + tx * scale, y + ty * scale, scale, scale)
 
 
 def _wifi_bars(x, y, signal_percent):
@@ -97,27 +135,29 @@ def _wifi_bars(x, y, signal_percent):
         bx = x + i * (bar_w + gap)
         by = base_y - bar_h
         if i < lit:
-            _oled.fill_rect(bx, by, bar_w, bar_h, 1)
+            _fill_rect(bx, by, bar_w, bar_h)
         else:
-            _oled.rect(bx, by, bar_w, bar_h, 1)
+            _rect_outline(bx, by, bar_w, bar_h)
 
 
 def _status_square(x, y, state):
     """state: 'on' (filled), 'off' (hollow), or 'error' (hollow + X)."""
     size = 8
     if state == "on":
-        _oled.fill_rect(x, y, size, size, 1)
+        _fill_rect(x, y, size, size)
     else:
-        _oled.rect(x, y, size, size, 1)
+        _rect_outline(x, y, size, size)
         if state == "error":
-            _oled.line(x, y, x + size - 1, y + size - 1, 1)
-            _oled.line(x, y + size - 1, x + size - 1, y, 1)
+            _line(x, y, x + size - 1, y + size - 1)
+            _line(x, y + size - 1, x + size - 1, y)
 
 
 def show_dashboard(percent, available_liters, capacity_liters, wifi_signal_percent, mqtt_connected, sensor_status, relay_on):
     """Main operational status screen: a top icon row (WiFi / MQTT / Sensor /
     Relay), a large hero percentage, and a bottom summary line. Does nothing
-    if no screen was detected at startup."""
+    if no screen was detected at startup. Never lets a display-drawing bug
+    crash the rest of the application - worst case, the screen just doesn't
+    update this cycle."""
     if not _available:
         return
     try:
@@ -156,5 +196,5 @@ def show_dashboard(percent, available_liters, capacity_liters, wifi_signal_perce
         _oled.text(summary, summary_x, 54)
 
         _oled.show()
-    except OSError:
-        pass
+    except Exception as e:
+        print("Display dashboard error (skipping this update):", e)

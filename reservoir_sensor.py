@@ -29,6 +29,11 @@ MAX_CHANGE_CM_PER_CYCLE = 15  # reject a reading that implies the water level ju
                                # more than this between cycles (~5s apart) - catches a
                                # persistent false echo that fools the within-cycle median,
                                # since a real reservoir can't physically move this fast
+JUMP_REJECT_GIVEUP_CYCLES = 3  # after this many consecutive rejections (~15s), stop
+                                # comparing against the old anchor and accept the next
+                                # reading fresh - a genuine fast change (e.g. active pump
+                                # fill) shouldn't take as long to register as a full
+                                # error-status escalation would
 
 _dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
 _dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
@@ -121,7 +126,8 @@ def read(config):
 
     distance = _sample_distance()
 
-    if distance is not None and _last_good_distance is not None:
+    if (distance is not None and _last_good_distance is not None
+            and _consecutive_failures < JUMP_REJECT_GIVEUP_CYCLES):
         implied_change = abs(distance - _last_good_distance)
         if implied_change > MAX_CHANGE_CM_PER_CYCLE:
             print("Rejecting implausible reading: {}cm (previous good: {}cm, jump: {}cm)".format(
