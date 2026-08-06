@@ -110,6 +110,8 @@ def check_for_update(display=None, wdt=None, on_progress=None):
 
             print("Downloading", filename)
             _progress("Downloading: {}".format(filename))
+            if display:
+                display.show("Update Found", "v" + remote_version, "Downloading:", filename)
             data = _download(url)
 
             if wdt:

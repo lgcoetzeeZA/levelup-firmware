@@ -35,6 +35,13 @@ JUMP_REJECT_GIVEUP_CYCLES = 3  # after this many consecutive rejections (~15s), 
                                 # fill) shouldn't take as long to register as a full
                                 # error-status escalation would
 
+# Set to False once sensor hardware/mounting is finalized, to re-enable
+# jump-rejection, cross-cycle smoothing, and serving a cached "last good"
+# value during brief sensor hiccups. While True, every cycle reports
+# exactly what the sensor currently measures, with none of that - intended
+# for actively diagnosing sensor behavior without any layer hiding it.
+DEBUG_RAW_MODE = True
+
 _dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
 _dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
 
@@ -125,6 +132,32 @@ def read(config):
     global _last_good_distance, _last_good_level, _last_good_time, _consecutive_failures, _smoothed_distance
 
     distance = _sample_distance()
+
+    if DEBUG_RAW_MODE:
+        # Testing mode: show exactly what the sensor reads this cycle, with
+        # none of the cross-cycle filtering below - no jump-rejection, no
+        # smoothing, and no serving a cached value on failure. A failed
+        # cycle is reported as a failure immediately, not hidden.
+        if distance is None:
+            _consecutive_failures += 1
+            return {
+                "status": "error",
+                "distance_cm": None,
+                "consecutive_failures": _consecutive_failures,
+                "seconds_since_good": None,
+                "level": None,
+            }
+
+        _consecutive_failures = 0
+        _last_good_time = time.time()
+        level = tank_calculator.calculate_level(distance, config)
+        return {
+            "status": "ok",
+            "distance_cm": round(distance, 1),
+            "consecutive_failures": 0,
+            "seconds_since_good": 0,
+            "level": level,
+        }
 
     if (distance is not None and _last_good_distance is not None
             and _consecutive_failures < JUMP_REJECT_GIVEUP_CYCLES):
