@@ -27,19 +27,37 @@ def _set_current_version(version):
         f.write(version)
 
 
-def _sha256_hex(data):
-    h = uhashlib.sha256()
-    h.update(data)
-    return ubinascii.hexlify(h.digest()).decode()
-
-
-def _download(url):
+def _download_to_file(url, dest_path, hasher=None, chunk_size=512):
+    """Streams the response directly to dest_path in small chunks, instead
+    of loading the whole file into memory at once. This matters a lot here:
+    OTA runs while the rest of the application (WiFi, MQTT, display, sensor
+    state) is still alive in memory, so even a single file's worth of bytes
+    held at once can fail to find a large-enough contiguous free block on a
+    fragmented heap - small chunk-sized allocations are much easier to
+    satisfy. If hasher is provided, it's fed incrementally as data streams
+    in, so we never need the full file in memory to verify it either."""
     response = urequests.get(url)
     try:
-        data = response.content
+        stream = getattr(response, "raw", None)
+        with open(dest_path, "wb") as f:
+            if stream is not None and hasattr(stream, "read"):
+                while True:
+                    chunk = stream.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    if hasher:
+                        hasher.update(chunk)
+            else:
+                # This urequests build doesn't expose a raw stream to read
+                # incrementally - fall back to reading the whole response
+                # at once. Still correct, just higher peak memory use.
+                data = response.content
+                f.write(data)
+                if hasher:
+                    hasher.update(data)
     finally:
         response.close()
-    return data
 
 
 def check_for_update(display=None, wdt=None, on_progress=None):
@@ -112,21 +130,20 @@ def check_for_update(display=None, wdt=None, on_progress=None):
             _progress("Downloading: {}".format(filename))
             if display:
                 display.show("Update Found", "v" + remote_version, "Downloading:", filename)
-            data = _download(url)
+
+            staging_name = filename + ".new"
+            hasher = uhashlib.sha256() if expected_hash else None
+            _download_to_file(url, staging_name, hasher=hasher)
 
             if wdt:
                 wdt.feed()
 
             if expected_hash:
-                actual_hash = _sha256_hex(data)
+                actual_hash = ubinascii.hexlify(hasher.digest()).decode()
                 if actual_hash != expected_hash:
                     raise ValueError("Hash mismatch for {}".format(filename))
 
-            staging_name = filename + ".new"
-            with open(staging_name, "wb") as f:
-                f.write(data)
             staged.append((staging_name, filename))
-            del data
             gc.collect()
 
     except (OSError, ValueError, KeyError, MemoryError) as e:

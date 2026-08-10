@@ -1,5 +1,5 @@
 {
-  "version": "1.0.15",
+  "version": "1.0.16",
   "files": {
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
@@ -27,7 +27,7 @@
     },
     "ota_updater.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
-      "sha256": "6f08cf4858d9770fb885f9fa93d3f1e5d5dce7842c65c52c7150e06540acb9e9"
+      "sha256": "a58063f6f2dd0dadb8565a879343a5e5fb7af8dd7aeee53f7ba927e0dc0094a6"
     },
     "relay_state.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/relay_state.py",
