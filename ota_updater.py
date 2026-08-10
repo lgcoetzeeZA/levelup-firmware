@@ -129,7 +129,7 @@ def check_for_update(display=None, wdt=None, on_progress=None):
             del data
             gc.collect()
 
-    except (OSError, ValueError, KeyError) as e:
+    except (OSError, ValueError, KeyError, MemoryError) as e:
         print("OTA update failed during download - leaving current files untouched:", e)
         _progress("Update failed ({}) - keeping current version v{}".format(e, current_version))
         for staging_name, _ in staged:
@@ -150,6 +150,8 @@ def check_for_update(display=None, wdt=None, on_progress=None):
         display.show("Applying Update", "", "Do not power off...")
 
     for staging_name, filename in staged:
+        if wdt:
+            wdt.feed()
         try:
             os.remove(filename)
         except OSError:
