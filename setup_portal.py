@@ -225,59 +225,6 @@ function toggleManual(){{
     return _page_shell("Manage WiFi Networks", body)
 
 
-def _render_edit_tank_page(config, error=None):
-    error_html = "<p style='color:#ff6b6b'>{}</p>".format(error) if error else ""
-
-    body = """
-{error}
-<form method="POST" action="/">
-<label>Tank Capacity (Liters)</label>
-<input type="number" step="any" name="liters" value="{liters}" required>
-<label>Tank Height (cm)</label>
-<input type="number" step="any" name="height" value="{height}" required>
-<label>Tank Diameter (cm)</label>
-<input type="number" step="any" name="diameter" value="{diameter}" required>
-<label>Sensor Height Above Full Water Line (cm)</label>
-<input type="number" step="any" name="sensor_offset" value="{sensor_offset}">
-<button type="submit">Save</button>
-</form>
-""".format(
-        error=error_html,
-        liters=config.get("tank_liters", 0),
-        height=config.get("tank_height", 0),
-        diameter=config.get("tank_diameter", 0),
-        sensor_offset=config.get("sensor_offset_cm", 0),
-    )
-
-    return _page_shell("Edit Tank Settings", body)
-
-
-def _handle_edit_tank_post(fields):
-    try:
-        liters = float(fields.get("liters", 0))
-        height = float(fields.get("height", 0))
-        diameter = float(fields.get("diameter", 0))
-        offset_raw = fields.get("sensor_offset", "").strip()
-        sensor_offset = float(offset_raw) if offset_raw else 0.0
-
-        if height <= 0 or diameter <= 0:
-            raise ValueError("missing required field")
-
-        config = load_config()
-        config["tank_liters"] = liters
-        config["tank_height"] = height
-        config["tank_diameter"] = diameter
-        config["sensor_offset_cm"] = sensor_offset
-        save_config(config)
-
-        status_led.set_status(status_led.STATUS_SAVED)
-        display.show("Tank Settings", "Saved", "", "Restarting...")
-        return _success_page("Tank settings updated."), True
-    except (ValueError, KeyError):
-        config = load_config()
-        return _render_edit_tank_page(config, error="Please enter valid numbers for all fields."), False
-
-
 def _success_page(message):
     body = """<div style="text-align:center">
 <p>{}</p>
@@ -465,8 +412,6 @@ def _handle_request(client, mode, scanned_networks):
             print("POST fields received:", fields)
             if mode == "add_network":
                 page, success = _handle_add_network_post(fields, scanned_networks)
-            elif mode == "edit_tank":
-                page, success = _handle_edit_tank_post(fields)
             else:
                 page, success = _handle_full_setup_post(fields, scanned_networks)
 
@@ -486,9 +431,6 @@ def _handle_request(client, mode, scanned_networks):
                     config.get("wifi_default_ssid", ""),
                     config
                 )
-            elif mode == "edit_tank":
-                config = load_config()
-                page = _render_edit_tank_page(config)
             else:
                 page = _render_full_setup_page(scanned_networks)
 
@@ -501,50 +443,6 @@ def _handle_request(client, mode, scanned_networks):
             client.close()
         except OSError:
             pass
-
-
-def run_edit_tank_server(wdt=None):
-    """Lightweight settings server for editing tank dimensions only. Runs
-    on the device's existing WiFi connection - no AP mode needed, since
-    the device is already online and reachable at its normal IP.
-
-    wdt: optional active WDT instance to keep feeding while waiting.
-
-    Always ends in machine.reset() - either after a successful save, or
-    after PORTAL_TIMEOUT_S with nothing saved, to resume normal operation."""
-    sta = network.WLAN(network.STA_IF)
-    if not sta.isconnected():
-        print("Cannot start tank edit server - WiFi not connected.")
-        return
-
-    ip = sta.ifconfig()[0]
-    print("Tank settings server active. Browse to: http://{}".format(ip))
-    display.show("Edit Tank", "Browse to:", ip, "", "")
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(("", 80))
-    s.listen(5)
-    s.settimeout(1.0)  # lets the loop periodically feed the watchdog
-
-    start = time.time()
-
-    while True:
-        if wdt:
-            wdt.feed()
-
-        if time.time() - start >= PORTAL_TIMEOUT_S:
-            print("Tank edit server timed out after {}s with nothing saved - rebooting.".format(PORTAL_TIMEOUT_S))
-            break
-
-        try:
-            client, addr = s.accept()
-        except OSError:
-            continue
-        _handle_request(client, "edit_tank", [])
-
-    s.close()
-    machine.reset()
 
 
 PORTAL_TIMEOUT_S = 300  # give up and reboot back to normal operation if

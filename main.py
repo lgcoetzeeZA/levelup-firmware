@@ -13,7 +13,6 @@ import reservoir_sensor
 import mqtt_handler
 import buttons
 import relay_state
-import rgb_led
 import ota_updater
 
 # ---------------------------------------------------------------------------
@@ -28,26 +27,15 @@ RELAY_PIN = 17
 RELAY_BUTTON_PIN = 16
 RELAY_HOLD_MS = 3000
 RIGHT_BUTTON_PIN = 4
-ADD_NETWORK_HOLD_MS = 5000
+ADD_NETWORK_HOLD_MS = 3000
 LEFT_BUTTON_PIN = 12
-EDIT_TANK_HOLD_MS = 5000
 OTA_BUTTON_HOLD_MS = 3000
 DIP1_PIN = 14
 DIP2_PIN = 13
-RGB_RED_PIN = 32
-RGB_GREEN_PIN = 25
-RGB_BLUE_PIN = 33
-
-# Set to False when the RGB LED feather board isn't plugged in - there's no
-# way to auto-detect a bare LED on PWM pins the way we can probe the OLED's
-# I2C bus, so this is a manual switch.
-RGB_LED_ENABLED = True
 
 relay = Pin(RELAY_PIN, Pin.OUT)
 relay.value(relay_state.load_relay_state())
 print("Relay resumed to saved state:", relay.value())
-
-rgb = rgb_led.RGBLed(RGB_RED_PIN, RGB_GREEN_PIN, RGB_BLUE_PIN) if RGB_LED_ENABLED else None
 
 dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
 dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
@@ -248,8 +236,6 @@ def run_app(config, wifi):
         reading = reservoir_sensor.read(config)
         wifi_signal_pct = rssi_to_percent(wifi.status("rssi")) if wifi else None
         update_display(reading, mqtt.connected, wifi_signal_pct, bool(relay.value()))
-        if rgb:
-            rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
         payload = build_status_payload(wifi, reading, relay.value(), config)
         published = mqtt.publish_json(topic_data, payload)
         if not wifi.isconnected():
@@ -300,20 +286,12 @@ def run_app(config, wifi):
             setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
             return  # unreachable - portal loops until the device resets
 
-        if dip1.value() == 1 and dip2.value() == 0:
-            if left_button.check_hold(OTA_BUTTON_HOLD_MS):
-                print("Checking for firmware update via button (dip1 armed)")
-                display.show("Checking for", "Update...", "", "")
-                ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
-                display.show("Check Complete", "", "", "")
-                time.sleep(2)
-        else:
-            if left_button.check_hold(EDIT_TANK_HOLD_MS):
-                print("Entering tank settings edit mode via button hold")
-                display.show("Edit Tank", "", "Starting server...")
-                time.sleep(1)
-                setup_portal.run_edit_tank_server(wdt=wdt)
-                return  # unreachable - server loops until the device resets
+        if left_button.check_hold(OTA_BUTTON_HOLD_MS):
+            print("Checking for firmware update via button")
+            display.show("Checking for", "Update...", "", "")
+            ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
+            display.show("Check Complete", "", "", "")
+            time.sleep(2)
 
         if relay.value() != last_relay_published:
             payload = b"relayOn" if relay.value() else b"relayOff"
