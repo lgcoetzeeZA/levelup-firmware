@@ -1,69 +1,9 @@
 {
   "version": "1.0.17",
   "files": {
-    "buttons.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
-      "sha256": "e673c212673c7d1b17c3e87e78483bc02ca1b9a3986b07e580c68a2c76bc1fa4"
-    },
-    "config_manager.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/config_manager.py",
-      "sha256": "f864efd4b8522d514a95646a1616b545aee369a849f75fb2ad1fe00c638ab0c7"
-    },
-    "display.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/display.py",
-      "sha256": "85d00410e6b9b487584508d18bf857e0b776933972df457ee09fc13f00d7abd7"
-    },
-    "indicator_led.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/indicator_led.py",
-      "sha256": "75806b2133125ca9a61f42f8dd59aedcf3eaa9e18b3f0e5dd38211aba9647e88"
-    },
-    "main.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "df7d516fa3eaf4eff7a93140e1d3c9557742474d57ef251f7bea520ffaf4216f"
-    },
-    "mqtt_handler.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
-      "sha256": "8473557e009a7e8854f0e1d64a91182ee3460d252bb95f78101ac4cb4884f310"
-    },
     "ota_updater.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
       "sha256": "a58063f6f2dd0dadb8565a879343a5e5fb7af8dd7aeee53f7ba927e0dc0094a6"
-    },
-    "relay_state.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/relay_state.py",
-      "sha256": "a01a152e8a369faf5ad273c191ffa206a2ca6386efa2b2c40f8c05b8cee171cf"
-    },
-    "reservoir_sensor.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/reservoir_sensor.py",
-      "sha256": "e9eabe4115f5cbf1c5d35ecb2029dad4f5b4971970d39018af4835952adbcfe6"
-    },
-    "rgb_led.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/rgb_led.py",
-      "sha256": "84809bc0f7ba4ba0b0d16e98fad48bec605df178c6d36cd84264a21e84de3603"
-    },
-    "setup_portal.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/setup_portal.py",
-      "sha256": "6f85dbdb8a5d40a8b3bdbf7616a65aaef565be05424b13dce8ffe942f0250222"
-    },
-    "ssd1306.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ssd1306.py",
-      "sha256": "1cf9d2525e0890a2fbf2e7023745f4abb0c93be9e1ec420aeffe812cd73ad7a6"
-    },
-    "status_led.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/status_led.py",
-      "sha256": "807a4b786b4012af9e4d21ba849b1f5510dabbeb4116af92f02f22ee566c805f"
-    },
-    "tank_calculator.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/tank_calculator.py",
-      "sha256": "c473a5716d636f6a07a27fb6e32a5e6821f8c4f6278851a67c3d8b7c2dc1bf86"
-    },
-    "ultrasonic_sensor.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ultrasonic_sensor.py",
-      "sha256": "6f00c8d066771d5c4b2818f88bc91c08da03e623f2ff0ef28897ba545473f38a"
-    },
-    "wifi_manager.py": {
-      "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/wifi_manager.py",
-      "sha256": "f2ddf82835f3af043a612141194b8a7ea8a2d044f0c86bd27341161c8d750883"
     }
   }
 }
