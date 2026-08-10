@@ -1,5 +1,5 @@
 {
-  "version": "1.0.13",
+  "version": "1.0.14",
   "files": {
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
@@ -19,7 +19,7 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "2585bb8ceb163b22bde9e8eb5f57eb4e65ff8c9f0030a1572a6b19e24671d338"
+      "sha256": "da8ebaa4612f0501887a0de0280b87bacb1d4fb3a8b901b11e058f074bc8dfdf"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
@@ -43,7 +43,7 @@
     },
     "setup_portal.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/setup_portal.py",
-      "sha256": "49cdcc62a684722370a27a7a1450dfa3c0e853671e592e63beaa7e038caff6be"
+      "sha256": "db65cf87be78b3f24e43ea8789229da141c40918153dc7f9725ae036f409e0fa"
     },
     "ssd1306.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ssd1306.py",

@@ -72,7 +72,7 @@ def get_client_id(config):
     return client_id
 
 
-def make_on_message(state, wdt, ota_progress, config):
+def make_on_message(state, wdt, ota_progress, config, publish_config, publish_data_now, publish_status_retained):
     """Returns an MQTT message callback closed over shared loop state,
     so incoming commands (e.g. relay toggle) can update the relay pin."""
     def on_message(topic, msg):
@@ -89,15 +89,15 @@ def make_on_message(state, wdt, ota_progress, config):
             set_relay(not relay.value())
             print("Relay toggled via MQTT ->", relay.value())
             ota_progress("Relay toggled via MQTT -> {}".format("ON" if relay.value() else "OFF"))
-        elif msg in (b"rebootDevice", b"restartDevice"):
+        elif msg in (b"rebootDevice", b"restartDevice", b"restart", b"reboot"):
             print("Reboot requested via MQTT")
             ota_progress("Rebooting device now...")
             time.sleep(1)
             machine.reset()
-        elif msg == b"checkForUpdate":
+        elif msg in (b"checkForUpdate", b"update", b"ota"):
             print("OTA check requested via MQTT")
             ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
-        elif msg in (b"enterSetup", b"addNetwork"):
+        elif msg in (b"enterSetup", b"addNetwork", b"setup"):
             print("Setup portal requested via MQTT")
             ota_progress(
                 "Entering setup mode. Connect to WiFi '{}' (password: {}), then "
@@ -105,8 +105,13 @@ def make_on_message(state, wdt, ota_progress, config):
                 "Device will be offline until you finish or it times out in 5 "
                 "minutes.".format(setup_portal.AP_SSID, setup_portal.AP_PASSWORD)
             )
+            publish_status_retained("setup_mode")
             setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
             # unreachable - run_setup_portal always ends in machine.reset()
+        elif msg == b"status":
+            print("Status requested via MQTT")
+            publish_config()
+            publish_data_now()
         elif msg.startswith(b"{"):
             try:
                 cmd = ujson.loads(msg)
@@ -125,6 +130,7 @@ def make_on_message(state, wdt, ota_progress, config):
                         config["tank_height"], config["tank_diameter"],
                         config["sensor_offset_cm"], config["tank_liters"]
                     ))
+                    publish_config()
                 else:
                     print("Unknown JSON command:", cmd)
                     ota_progress("Unknown command: {}".format(cmd.get("cmd", "?")))
@@ -184,6 +190,19 @@ def build_status_payload(wifi, reading, relay_state, config):
     }
 
 
+def build_config_payload(config, client_id):
+    return {
+        "firmware": "LevelUp",
+        "version": ota_updater.get_current_version(),
+        "prefix": client_id,
+        "tank_diameter_cm": config.get("tank_diameter"),
+        "tank_overflow_cm": config.get("tank_height"),
+        "sensor_from_overflow_cm": config.get("sensor_offset_cm"),
+        "tank_roof_cm": (config.get("tank_height") or 0) + (config.get("sensor_offset_cm") or 0),
+        "tank_liters": config.get("tank_liters"),
+    }
+
+
 def update_display(reading, mqtt_connected, wifi_signal_percent, relay_on):
     level = reading["level"]
     percent = level["percent"] if level else None
@@ -206,26 +225,52 @@ def run_app(config, wifi):
     topic_relay = "{}/{}/relay".format(client_id, MQTT_TOPIC_PREFIX)
     topic_progress = "{}/{}/progress".format(client_id, MQTT_TOPIC_PREFIX)
     topic_status = "{}/{}/status".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_config = "{}/{}/config".format(client_id, MQTT_TOPIC_PREFIX)
 
     wdt = WDT(timeout=WDT_TIMEOUT_MS)
 
+    last_publish = time.time()
+    last_relay_published = None
+    last_ota_check = time.time()
+    was_mqtt_connected = False
+
     def ota_progress(message):
         mqtt.publish_raw(topic_progress, message)
+
+    def publish_status_retained(status_msg):
+        mqtt.publish_raw(topic_status, status_msg, retain=True)
+
+    def publish_config():
+        mqtt.publish_json(topic_config, build_config_payload(config, client_id))
+
+    def publish_data_now():
+        nonlocal last_publish
+        reading = reservoir_sensor.read(config)
+        wifi_signal_pct = rssi_to_percent(wifi.status("rssi")) if wifi else None
+        update_display(reading, mqtt.connected, wifi_signal_pct, bool(relay.value()))
+        if rgb:
+            rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
+        payload = build_status_payload(wifi, reading, relay.value(), config)
+        published = mqtt.publish_json(topic_data, payload)
+        if not wifi.isconnected():
+            status_led.set_status(status_led.STATUS_WIFI_FAILED)
+        elif not mqtt.connected:
+            status_led.set_status(status_led.STATUS_MQTT_FAILED)
+        else:
+            status_led.set_status(status_led.STATUS_CONNECTED)
+        print("Published" if published else "Publish skipped (MQTT not connected)", payload)
+        last_publish = time.time()
 
     state = {}
     mqtt = mqtt_handler.MQTTHandler(
         client_id=client_id,
         server=MQTT_BROKER,
         sub_topic=topic_cmd,
-        on_message=make_on_message(state, wdt, ota_progress, config),
+        on_message=make_on_message(state, wdt, ota_progress, config, publish_config, publish_data_now, publish_status_retained),
         keepalive=60,
         lw_topic=topic_status,
         lw_msg="offline",
     )
-
-    last_publish = time.time()
-    last_relay_published = None
-    last_ota_check = time.time()
 
     while True:
         wdt.feed()
@@ -235,6 +280,9 @@ def run_app(config, wifi):
             machine.reset()
 
         mqtt.ensure_connected()
+        if mqtt.connected and not was_mqtt_connected:
+            publish_config()
+        was_mqtt_connected = mqtt.connected
         mqtt.check_messages()
         mqtt.keepalive_ping()
 
@@ -247,6 +295,7 @@ def run_app(config, wifi):
         if right_button.check_hold(ADD_NETWORK_HOLD_MS):
             print("Entering Add Network setup mode via button hold")
             display.show("Add Network", "", "Entering setup", "mode...")
+            publish_status_retained("setup_mode")
             time.sleep(1)
             setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
             return  # unreachable - portal loops until the device resets
@@ -273,25 +322,7 @@ def run_app(config, wifi):
                 print("Published relay state:", payload)
 
         if time.time() - last_publish >= PUBLISH_INTERVAL_SEC:
-            reading = reservoir_sensor.read(config)
-            wifi_signal_pct = rssi_to_percent(wifi.status("rssi")) if wifi else None
-            update_display(reading, mqtt.connected, wifi_signal_pct, bool(relay.value()))
-            if rgb:
-                rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
-
-            payload = build_status_payload(wifi, reading, relay.value(), config)
-            published = mqtt.publish_json(topic_data, payload)
-
-            if not wifi.isconnected():
-                status_led.set_status(status_led.STATUS_WIFI_FAILED)
-            elif not mqtt.connected:
-                status_led.set_status(status_led.STATUS_MQTT_FAILED)
-            else:
-                status_led.set_status(status_led.STATUS_CONNECTED)
-
-            print("Published" if published else "Publish skipped (MQTT not connected)", payload)
-
-            last_publish = time.time()
+            publish_data_now()
 
         if time.time() - last_ota_check >= OTA_CHECK_INTERVAL_SEC:
             print("Running scheduled OTA check...")

@@ -69,7 +69,9 @@ def _scan_networks():
     return networks
 
 
-def _ssid_dropdown_html(scanned_networks):
+def _ssid_dropdown_html(scanned_networks, include_none_option=False):
+    none_option = '<option value="__none__" selected>-- Leave unchanged, no new network --</option>\n' if include_none_option else ""
+
     if scanned_networks:
         options = ""
         for name, rssi in scanned_networks:
@@ -78,9 +80,12 @@ def _ssid_dropdown_html(scanned_networks):
         options += '<option value="__other__">Other (enter manually)</option>'
         manual_display = "none"
     else:
-        options = '<option value="__other__" selected>Other (enter manually)</option>'
-        manual_display = "block"
-    return options, manual_display
+        options = '<option value="__other__"{0}>Other (enter manually)</option>'.format(
+            "" if include_none_option else " selected"
+        )
+        manual_display = "none" if include_none_option else "block"
+
+    return none_option + options, manual_display
 
 
 def _page_shell(title, body):
@@ -150,9 +155,9 @@ function toggleManual(){{
     return _page_shell("LevelUp Device Setup", body)
 
 
-def _render_add_network_page(scanned_networks, existing_networks, default_ssid, error=None):
+def _render_add_network_page(scanned_networks, existing_networks, default_ssid, config, error=None):
     error_html = "<p style='color:#ff6b6b'>{}</p>".format(error) if error else ""
-    options, manual_display = _ssid_dropdown_html(scanned_networks)
+    options, manual_display = _ssid_dropdown_html(scanned_networks, include_none_option=True)
 
     saved_rows = ""
     if existing_networks:
@@ -190,6 +195,15 @@ def _render_add_network_page(scanned_networks, existing_networks, default_ssid, 
 <input type="radio" name="default_choice" value="__new__">
 <span>Make this new network the default</span>
 </div>
+<h2>Tank Settings</h2>
+<label>Tank Capacity (Liters)</label>
+<input type="number" step="any" name="liters" value="{liters}" required>
+<label>Tank Height (cm)</label>
+<input type="number" step="any" name="height" value="{height}" required>
+<label>Tank Diameter (cm)</label>
+<input type="number" step="any" name="diameter" value="{diameter}" required>
+<label>Sensor Height Above Full Water Line (cm)</label>
+<input type="number" step="any" name="sensor_offset" value="{sensor_offset}">
 <button type="submit">Save</button>
 </form>
 <script>
@@ -201,7 +215,11 @@ function toggleManual(){{
 </script>
 """.format(
         error=error_html, saved_rows=saved_rows, options=options,
-        manual_display=manual_display
+        manual_display=manual_display,
+        liters=config.get("tank_liters", 0),
+        height=config.get("tank_height", 0),
+        diameter=config.get("tank_diameter", 0),
+        sensor_offset=config.get("sensor_offset_cm", 0),
     )
 
     return _page_shell("Manage WiFi Networks", body)
@@ -270,7 +288,7 @@ def _success_page(message):
 
 def _resolve_new_ssid(fields):
     ssid_select = fields.get("ssid_select", "")
-    if ssid_select and ssid_select != "__other__":
+    if ssid_select and ssid_select not in ("__other__", "__none__"):
         return ssid_select
     return fields.get("ssid_manual", "").strip()
 
@@ -331,7 +349,8 @@ def _handle_add_network_post(fields, scanned_networks):
             found = False
             for net in networks:
                 if net["ssid"] == new_ssid:
-                    net["pwd"] = new_pwd
+                    if new_pwd:  # never blank out an existing saved password
+                        net["pwd"] = new_pwd
                     found = True
                     break
             if not found:
@@ -351,17 +370,32 @@ def _handle_add_network_post(fields, scanned_networks):
         if not config.get("wifi_networks"):
             raise ValueError("no networks saved")
 
+        liters = float(fields.get("liters", 0))
+        height = float(fields.get("height", 0))
+        diameter = float(fields.get("diameter", 0))
+        offset_raw = fields.get("sensor_offset", "").strip()
+        sensor_offset = float(offset_raw) if offset_raw else 0.0
+
+        if height <= 0 or diameter <= 0:
+            raise ValueError("missing required tank field")
+
+        config["tank_liters"] = liters
+        config["tank_height"] = height
+        config["tank_diameter"] = diameter
+        config["sensor_offset_cm"] = sensor_offset
+
         save_config(config)
 
         status_led.set_status(status_led.STATUS_SAVED)
         display.show("Settings Saved", "", "Restarting...")
-        return _success_page("Network settings saved."), True
+        return _success_page("Network and tank settings saved."), True
     except (ValueError, KeyError):
         config = load_config()
         return _render_add_network_page(
             scanned_networks,
             config.get("wifi_networks", []),
             config.get("wifi_default_ssid", ""),
+            config,
             error="Please check the form and try again."
         ), False
 
@@ -449,7 +483,8 @@ def _handle_request(client, mode, scanned_networks):
                 page = _render_add_network_page(
                     scanned_networks,
                     config.get("wifi_networks", []),
-                    config.get("wifi_default_ssid", "")
+                    config.get("wifi_default_ssid", ""),
+                    config
                 )
             elif mode == "edit_tank":
                 config = load_config()
