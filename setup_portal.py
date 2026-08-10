@@ -473,7 +473,10 @@ def run_edit_tank_server(wdt=None):
     on the device's existing WiFi connection - no AP mode needed, since
     the device is already online and reachable at its normal IP.
 
-    wdt: optional active WDT instance to keep feeding while waiting."""
+    wdt: optional active WDT instance to keep feeding while waiting.
+
+    Always ends in machine.reset() - either after a successful save, or
+    after PORTAL_TIMEOUT_S with nothing saved, to resume normal operation."""
     sta = network.WLAN(network.STA_IF)
     if not sta.isconnected():
         print("Cannot start tank edit server - WiFi not connected.")
@@ -489,14 +492,46 @@ def run_edit_tank_server(wdt=None):
     s.listen(5)
     s.settimeout(1.0)  # lets the loop periodically feed the watchdog
 
+    start = time.time()
+
     while True:
         if wdt:
             wdt.feed()
+
+        if time.time() - start >= PORTAL_TIMEOUT_S:
+            print("Tank edit server timed out after {}s with nothing saved - rebooting.".format(PORTAL_TIMEOUT_S))
+            break
+
         try:
             client, addr = s.accept()
         except OSError:
             continue
         _handle_request(client, "edit_tank", [])
+
+    s.close()
+    machine.reset()
+
+
+PORTAL_TIMEOUT_S = 300  # give up and reboot back to normal operation if
+                         # nobody completes setup in this long - important
+                         # once this can be triggered remotely via MQTT,
+                         # where nobody may be able to reach the AP quickly
+
+
+def _dns_reply(data, ip):
+    """Minimal DNS response pointing every query at `ip` - this is what
+    makes a phone auto-open the setup page (captive portal behavior)
+    instead of requiring the IP to be typed in manually."""
+    packet = data[:2] + b"\x81\x80"
+    packet += data[4:6] * 2          # QDCOUNT -> also used as ANCOUNT
+    packet += b"\x00\x00\x00\x00"    # NSCOUNT, ARCOUNT
+    packet += data[12:]              # echo the original question
+    packet += b"\xc0\x0c"            # pointer to name in question
+    packet += b"\x00\x01\x00\x01"    # TYPE A, CLASS IN
+    packet += b"\x00\x00\x00\x3c"    # TTL 60s
+    packet += b"\x00\x04"
+    packet += bytes(int(x) for x in ip.split("."))
+    return packet
 
 
 def run_setup_portal(mode="full", wdt=None):
@@ -505,7 +540,11 @@ def run_setup_portal(mode="full", wdt=None):
     configured device.
 
     wdt: optional active WDT instance - if provided, it's fed periodically
-    so this function can run safely even after the watchdog has started."""
+    so this function can run safely even after the watchdog has started.
+
+    Always ends in machine.reset() - either after a successful save, or
+    after PORTAL_TIMEOUT_S with nothing saved, to resume normal operation
+    with whatever config already existed."""
     print("Scanning for nearby WiFi networks...")
     networks = _scan_networks()
     print("Found {} network(s)".format(len(networks)))
@@ -527,17 +566,45 @@ def run_setup_portal(mode="full", wdt=None):
     else:
         display.show("Setup Mode", "WiFi: " + AP_SSID, "Pass: " + AP_PASSWORD, "Browse to:", ip)
 
+    dns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    dns.setblocking(False)
+    dns_ok = True
+    try:
+        dns.bind(("0.0.0.0", 53))
+    except OSError as e:
+        print("Could not start captive-portal DNS responder (setup still works via manual IP):", e)
+        dns_ok = False
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("", 80))
     s.listen(5)
     s.settimeout(1.0)  # lets the loop periodically feed the watchdog
 
+    start = time.time()
+
     while True:
         if wdt:
             wdt.feed()
+
+        if time.time() - start >= PORTAL_TIMEOUT_S:
+            print("Setup portal timed out after {}s with nothing saved - rebooting.".format(PORTAL_TIMEOUT_S))
+            break
+
+        if dns_ok:
+            try:
+                data, addr = dns.recvfrom(512)
+                dns.sendto(_dns_reply(data, ip), addr)
+            except OSError:
+                pass
+
         try:
             client, addr = s.accept()
         except OSError:
             continue  # accept() timed out - no connection yet, loop back
         _handle_request(client, mode, networks)
+
+    s.close()
+    dns.close()
+    ap.active(False)
+    machine.reset()

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.12",
+  "version": "1.0.13",
   "files": {
     "buttons.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/buttons.py",
@@ -19,11 +19,11 @@
     },
     "main.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/main.py",
-      "sha256": "03ac5da0471371abc173e969d70199b0aec38e08970ee227232f6a686cd2373e"
+      "sha256": "2585bb8ceb163b22bde9e8eb5f57eb4e65ff8c9f0030a1572a6b19e24671d338"
     },
     "mqtt_handler.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/mqtt_handler.py",
-      "sha256": "39f98fafab5863a3e5cf9d5fcb1d9ef1052a9a4be469a94489393c369967d417"
+      "sha256": "8473557e009a7e8854f0e1d64a91182ee3460d252bb95f78101ac4cb4884f310"
     },
     "ota_updater.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ota_updater.py",
@@ -43,7 +43,7 @@
     },
     "setup_portal.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/setup_portal.py",
-      "sha256": "13a7c7120551cafaeeebad33c5e6f25c644132b724976bb0a398f253721fb708"
+      "sha256": "49cdcc62a684722370a27a7a1450dfa3c0e853671e592e63beaa7e038caff6be"
     },
     "ssd1306.py": {
       "url": "https://raw.githubusercontent.com/lgcoetzeeZA/levelup-firmware/main/ssd1306.py",

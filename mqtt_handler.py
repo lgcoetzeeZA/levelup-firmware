@@ -16,12 +16,16 @@ SOCKET_TIMEOUT_SEC = 5
 
 
 class MQTTHandler:
-    def __init__(self, client_id, server, sub_topic=None, on_message=None, keepalive=60):
+    def __init__(self, client_id, server, sub_topic=None, on_message=None, keepalive=60,
+                 lw_topic=None, lw_msg=None):
         self.client_id = client_id
         self.server = server
         self.sub_topic = sub_topic
         self.on_message = on_message
         self.keepalive = keepalive
+        self.lw_topic = lw_topic  # e.g. "<clientId>/LevelUp/status"
+        self.lw_msg = lw_msg      # e.g. "offline" - broker auto-publishes this
+                                   # (retained) if the connection drops ungracefully
 
         self.client = None
         self.connected = False
@@ -33,6 +37,8 @@ class MQTTHandler:
             client = MQTTClient(self.client_id, self.server, keepalive=self.keepalive)
             if self.on_message:
                 client.set_callback(self.on_message)
+            if self.lw_topic and self.lw_msg:
+                client.set_last_will(self.lw_topic, self.lw_msg, retain=True, qos=0)
             client.connect()
             if self.sub_topic:
                 client.subscribe(self.sub_topic)
@@ -47,6 +53,16 @@ class MQTTHandler:
             self.connected = True
             self._last_ping = time.time()
             print("MQTT connected to", self.server)
+
+            if self.lw_topic:
+                # The Last Will only fires on an *ungraceful* disconnect -
+                # we still need to proactively announce "online" ourselves
+                # on every successful (re)connect.
+                try:
+                    client.publish(self.lw_topic, "online", retain=True)
+                except OSError as e:
+                    print("Could not publish online status:", e)
+
             return True
         except OSError as e:
             print("MQTT connect failed:", e)
@@ -106,13 +122,13 @@ class MQTTHandler:
             self.connected = False
             return False
 
-    def publish_raw(self, topic, payload):
+    def publish_raw(self, topic, payload, retain=False):
         """Publish a raw string/bytes payload (no JSON wrapping) - useful
         for dashboard widgets that expect plain text like 'relayOn'."""
         if not self.connected or self.client is None:
             return False
         try:
-            self.client.publish(topic, payload)
+            self.client.publish(topic, payload, retain=retain)
             return True
         except OSError as e:
             print("MQTT publish failed:", e)

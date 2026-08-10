@@ -97,6 +97,16 @@ def make_on_message(state, wdt, ota_progress, config):
         elif msg == b"checkForUpdate":
             print("OTA check requested via MQTT")
             ota_updater.check_for_update(display=display, wdt=wdt, on_progress=ota_progress)
+        elif msg in (b"enterSetup", b"addNetwork"):
+            print("Setup portal requested via MQTT")
+            ota_progress(
+                "Entering setup mode. Connect to WiFi '{}' (password: {}), then "
+                "browse to http://192.168.4.1 to add/manage WiFi networks. "
+                "Device will be offline until you finish or it times out in 5 "
+                "minutes.".format(setup_portal.AP_SSID, setup_portal.AP_PASSWORD)
+            )
+            setup_portal.run_setup_portal(mode="add_network", wdt=wdt)
+            # unreachable - run_setup_portal always ends in machine.reset()
         elif msg.startswith(b"{"):
             try:
                 cmd = ujson.loads(msg)
@@ -149,26 +159,27 @@ def build_status_payload(wifi, reading, relay_state, config):
     level = reading["level"] or {}
 
     return {
-        "sensorType": reservoir_sensor.get_sensor_type(),
-        "sensorStatus": reading["status"],
-        "distanceCm": reading["distance_cm"],
-        "consecutiveFailures": reading["consecutive_failures"],
-        "secondsSinceGoodReading": reading.get("seconds_since_good"),
-        "tankPercent": level.get("percent"),
-        "tankAvailableLiters": level.get("available_liters"),
-        "tankCapacityLiters": level.get("capacity_liters"),
-        "tankHeightCm": config.get("tank_height"),
-        "tankDiameterCm": config.get("tank_diameter"),
-        "sensorOffsetCm": config.get("sensor_offset_cm"),
-        "relayStatus": int(relay_state),
+        "sensor_type": reservoir_sensor.get_sensor_type(),
+        "sensor_status": reading["status"],
+        "distance_cm": reading["distance_cm"],
+        "consecutive_failures": reading["consecutive_failures"],
+        "seconds_since_good": reading.get("seconds_since_good"),
+        "level_pct": level.get("percent"),
+        "water_cm": level.get("water_height_cm"),
+        "volume_l": level.get("available_liters"),
+        "tank_volume_l": level.get("capacity_liters"),
+        "tank_overflow_cm": config.get("tank_height"),
+        "tank_diameter_cm": config.get("tank_diameter"),
+        "sensor_from_overflow_cm": config.get("sensor_offset_cm"),
+        "relay_status": int(relay_state),
         "dip1": dip1.value(),
         "dip2": dip2.value(),
-        "oledConnected": display.available(),
-        "firmwareVersion": ota_updater.get_current_version(),
-        "wifiSSID": str(wifi.config("essid")) if wifi else None,
-        "wifiRSSI": wifi.status("rssi") if wifi else None,
-        "wifiSignalPercent": rssi_to_percent(wifi.status("rssi")) if wifi else None,
-        "ipAddress": wifi.ifconfig()[0] if wifi else None,
+        "oled_connected": display.available(),
+        "version": ota_updater.get_current_version(),
+        "ssid": str(wifi.config("essid")) if wifi else None,
+        "rssi": wifi.status("rssi") if wifi else None,
+        "wifi_signal_pct": rssi_to_percent(wifi.status("rssi")) if wifi else None,
+        "ip": wifi.ifconfig()[0] if wifi else None,
         "timestamp": timestamp,
     }
 
@@ -190,23 +201,26 @@ def run_app(config, wifi):
     client_id = get_client_id(config)
     print("MQTT client ID:", client_id)
 
-    topic_pub = "{}/{}/pub".format(client_id, MQTT_TOPIC_PREFIX)
-    topic_sub = "{}/{}/sub".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_data = "{}/{}/data".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_cmd = "{}/{}/cmd".format(client_id, MQTT_TOPIC_PREFIX)
     topic_relay = "{}/{}/relay".format(client_id, MQTT_TOPIC_PREFIX)
-    topic_ota = "{}/{}/ota".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_progress = "{}/{}/progress".format(client_id, MQTT_TOPIC_PREFIX)
+    topic_status = "{}/{}/status".format(client_id, MQTT_TOPIC_PREFIX)
 
     wdt = WDT(timeout=WDT_TIMEOUT_MS)
 
     def ota_progress(message):
-        mqtt.publish_raw(topic_ota, message)
+        mqtt.publish_raw(topic_progress, message)
 
     state = {}
     mqtt = mqtt_handler.MQTTHandler(
         client_id=client_id,
         server=MQTT_BROKER,
-        sub_topic=topic_sub,
+        sub_topic=topic_cmd,
         on_message=make_on_message(state, wdt, ota_progress, config),
         keepalive=60,
+        lw_topic=topic_status,
+        lw_msg="offline",
     )
 
     last_publish = time.time()
@@ -266,7 +280,7 @@ def run_app(config, wifi):
                 rgb.set_percent(reading["level"]["percent"] if reading["level"] else None)
 
             payload = build_status_payload(wifi, reading, relay.value(), config)
-            published = mqtt.publish_json(topic_pub, payload)
+            published = mqtt.publish_json(topic_data, payload)
 
             if not wifi.isconnected():
                 status_led.set_status(status_led.STATUS_WIFI_FAILED)
