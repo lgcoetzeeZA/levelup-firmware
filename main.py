@@ -156,12 +156,10 @@ def build_status_payload(wifi, reading, relay_state, config):
         "sensor_type": reservoir_sensor.get_sensor_type(),
         "sensor_status": reading["status"],
         "distance_cm": reading["distance_cm"],
-        "consecutive_failures": reading["consecutive_failures"],
-        "seconds_since_good": reading.get("seconds_since_good"),
         "level_pct": level.get("percent"),
-        "water_cm": level.get("water_height_cm"),
-        "volume_l": level.get("available_liters"),
-        "tank_volume_l": level.get("capacity_liters"),
+        "water_cm": level.get("water_cm"),
+        "volume_l": level.get("volume_l"),
+        "tank_volume_l": level.get("tank_volume_l"),
         "tank_overflow_cm": config.get("tank_height"),
         "tank_diameter_cm": config.get("tank_diameter"),
         "sensor_from_overflow_cm": config.get("sensor_offset_cm"),
@@ -194,8 +192,8 @@ def build_config_payload(config, client_id):
 def update_display(reading, mqtt_connected, wifi_signal_percent, relay_on):
     level = reading["level"]
     percent = level["percent"] if level else None
-    available = level["available_liters"] if level else None
-    capacity = level["capacity_liters"] if level else None
+    available = level["volume_l"] if level else None
+    capacity = level["tank_volume_l"] if level else None
 
     display.show_dashboard(
         percent, available, capacity,

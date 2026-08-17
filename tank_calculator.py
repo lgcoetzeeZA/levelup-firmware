@@ -1,94 +1,67 @@
+"""
+Tank level/volume calculation - matches LevelMicro's math exactly.
+
+Percentage and volume are both derived purely from tank geometry (height +
+diameter) and the measured distance. There is no separate "rated capacity"
+override - a real tank's capacity is whatever its actual dimensions say it
+is, computed the same way every time.
+
+    sensor
+      |
+      | sensor_offset_cm   <- gap between sensor and the full/overflow line
+      |
+    ==+== full/overflow line (100% - water above this just spills out)
+      |
+      | tank_height_cm     <- usable fill height, bottom to overflow
+      |
+    __|__ tank bottom (0%)
+
+  tank_roof_cm = sensor_offset_cm + tank_height_cm
+               = distance the sensor reads when the tank is completely empty
+"""
+
 import math
 
 
-def geometric_capacity_liters(height_cm, diameter_cm):
-    """Capacity of a cylindrical tank calculated purely from its dimensions."""
-    radius_cm = diameter_cm / 2
-    volume_cm3 = math.pi * (radius_cm ** 2) * height_cm
-    return volume_cm3 / 1000.0  # 1000 cm^3 = 1 liter
-
-
-def capacity_mismatch_warning(config, threshold_percent=15):
-    """Returns a warning string if the entered rated capacity differs
-    significantly from what the entered dimensions geometrically imply -
-    useful right after setup to catch a typo in height/diameter/liters."""
-    height = config.get("tank_height", 0)
-    diameter = config.get("tank_diameter", 0)
-    rated = config.get("tank_liters", 0)
-
-    if height <= 0 or diameter <= 0 or rated <= 0:
-        return None
-
-    geo = geometric_capacity_liters(height, diameter)
-    if geo <= 0:
-        return None
-
-    diff_percent = abs(geo - rated) / geo * 100
-    if diff_percent > threshold_percent:
-        return "Entered capacity ({} L) differs from calculated ({:.0f} L) by {:.0f}%. Check dimensions.".format(
-            rated, geo, diff_percent
-        )
-    return None
+def tank_roof_cm(config):
+    """Sensor reading when the tank is completely empty (0%)."""
+    return config.get("sensor_offset_cm", 0) + config.get("tank_height", 0)
 
 
 def calculate_level(distance_cm, config):
     """
     distance_cm: measured distance from the sensor (mounted at the top,
                  facing down) to the water surface.
-    config: dict with tank_height, tank_diameter, tank_liters (rated capacity),
-            and sensor_offset_cm (gap between the sensor and the true full/
-            overflow line - 0 if the sensor sits flush at the top).
+    config: dict with tank_height, tank_diameter, sensor_offset_cm.
 
     Returns a dict, or None if the config/reading isn't usable:
-      percent                    - fill percentage (0-100), from geometry + sensor
-      water_height_cm            - calculated depth of water
-      available_liters           - liters available, scaled to rated capacity
-      capacity_liters            - the capacity used for the liters figure above
-      geometric_capacity_liters  - capacity calculated purely from dimensions
+      percent        - fill percentage (0-100)
+      water_cm       - depth of water, in cm
+      volume_l       - liters currently in the tank
+      tank_volume_l  - total tank capacity (at 100%), in liters
     """
     height = config.get("tank_height", 0)
     diameter = config.get("tank_diameter", 0)
-    rated_capacity = config.get("tank_liters", 0)
-    sensor_offset = config.get("sensor_offset_cm", 0)
 
     if height <= 0 or diameter <= 0:
         return None
-
     if distance_cm is None:
         return None
 
-    # Total distance the sensor sees when the tank is completely empty:
-    # the tank's own height, plus however far the sensor is mounted above
-    # the true full/overflow line.
-    full_span_cm = height + sensor_offset
+    roof_cm = tank_roof_cm(config)
 
-    water_height_cm = full_span_cm - distance_cm
-    # Clamp - a sensor glitch shouldn't report negative water or an overflow
-    if water_height_cm < 0:
-        water_height_cm = 0
-    if water_height_cm > height:
-        water_height_cm = height
+    water_cm = roof_cm - distance_cm
+    water_cm = max(0.0, min(water_cm, float(height)))
 
-    geo_capacity = geometric_capacity_liters(height, diameter)
-    if geo_capacity <= 0:
-        return None
+    percent = round(100.0 * water_cm / height, 1) if height > 0 else 0.0
 
-    percent = (water_height_cm / height) * 100
-    if percent > 100:
-        percent = 100
-    if percent < 0:
-        percent = 0
-
-    # Scale available liters to the rated capacity where the user provided one,
-    # so the figure matches the label on the tank rather than a pure geometric
-    # estimate (real tanks aren't perfect cylinders).
-    display_capacity = rated_capacity if rated_capacity > 0 else geo_capacity
-    available_liters = (percent / 100) * display_capacity
+    radius_m = (diameter / 2.0) / 100.0
+    volume_l = round(math.pi * radius_m * radius_m * (water_cm / 100.0) * 1000.0, 1)
+    tank_volume_l = round(math.pi * radius_m * radius_m * (height / 100.0) * 1000.0, 1)
 
     return {
-        "percent": round(percent, 1),
-        "water_height_cm": round(water_height_cm, 1),
-        "available_liters": round(available_liters, 1),
-        "capacity_liters": round(display_capacity, 1),
-        "geometric_capacity_liters": round(geo_capacity, 1),
+        "percent": percent,
+        "water_cm": round(water_cm, 1),
+        "volume_l": volume_l,
+        "tank_volume_l": tank_volume_l,
     }
