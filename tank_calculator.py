@@ -32,16 +32,20 @@ def calculate_level(distance_cm, config):
     """
     distance_cm: measured distance from the sensor (mounted at the top,
                  facing down) to the water surface.
-    config: dict with tank_height, tank_diameter, sensor_offset_cm.
+    config: dict with tank_height, tank_diameter, sensor_offset_cm, and
+            tank_count (identical tanks connected in series, sharing one
+            water level - default 1).
 
     Returns a dict, or None if the config/reading isn't usable:
-      percent        - fill percentage (0-100)
-      water_cm       - depth of water, in cm
-      volume_l       - liters currently in the tank
-      tank_volume_l  - total tank capacity (at 100%), in liters
+      percent        - fill percentage (0-100) - a ratio, unaffected by
+                       tank_count since all connected tanks share one level
+      water_cm       - depth of water, in cm (single tank's depth)
+      volume_l       - liters currently available, across all connected tanks
+      tank_volume_l  - total capacity (at 100%), across all connected tanks
     """
     height = config.get("tank_height", 0)
     diameter = config.get("tank_diameter", 0)
+    tank_count = config.get("tank_count", 1) or 1
 
     if height <= 0 or diameter <= 0:
         return None
@@ -56,8 +60,11 @@ def calculate_level(distance_cm, config):
     percent = round(100.0 * water_cm / height, 1) if height > 0 else 0.0
 
     radius_m = (diameter / 2.0) / 100.0
-    volume_l = round(math.pi * radius_m * radius_m * (water_cm / 100.0) * 1000.0, 1)
-    tank_volume_l = round(math.pi * radius_m * radius_m * (height / 100.0) * 1000.0, 1)
+    single_volume_l = math.pi * radius_m * radius_m * (water_cm / 100.0) * 1000.0
+    single_tank_volume_l = math.pi * radius_m * radius_m * (height / 100.0) * 1000.0
+
+    volume_l = round(single_volume_l * tank_count, 1)
+    tank_volume_l = round(single_tank_volume_l * tank_count, 1)
 
     return {
         "percent": percent,

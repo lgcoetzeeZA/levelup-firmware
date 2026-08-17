@@ -139,6 +139,8 @@ def _render_full_setup_page(scanned_networks, error=None):
 <input type="number" step="any" name="diameter" required>
 <label>Sensor Height Above Full Water Line (cm)</label>
 <input type="number" step="any" name="sensor_offset" placeholder="Leave blank if sensor sits flush at the top">
+<label>Number of Tanks Connected (identical, sharing one water level)</label>
+<input type="number" step="1" min="1" name="tank_count" value="1">
 <label>MQTT Client ID (optional)</label>
 <input type="text" name="mqtt_client_id" placeholder="Leave blank for auto-generated ID">
 <button type="submit">Save &amp; Connect</button>
@@ -204,6 +206,8 @@ def _render_add_network_page(scanned_networks, existing_networks, default_ssid, 
 <input type="number" step="any" name="diameter" value="{diameter}" required>
 <label>Sensor Height Above Full Water Line (cm)</label>
 <input type="number" step="any" name="sensor_offset" value="{sensor_offset}">
+<label>Number of Tanks Connected (identical, sharing one water level)</label>
+<input type="number" step="1" min="1" name="tank_count" value="{tank_count}">
 <button type="submit">Save</button>
 </form>
 <script>
@@ -220,6 +224,7 @@ function toggleManual(){{
         height=config.get("tank_height", 0),
         diameter=config.get("tank_diameter", 0),
         sensor_offset=config.get("sensor_offset_cm", 0),
+        tank_count=config.get("tank_count", 1),
     )
 
     return _page_shell("Manage WiFi Networks", body)
@@ -249,6 +254,10 @@ def _handle_full_setup_post(fields, scanned_networks):
         diameter = float(fields.get("diameter", 0))
         offset_raw = fields.get("sensor_offset", "").strip()
         sensor_offset = float(offset_raw) if offset_raw else 0.0
+        count_raw = fields.get("tank_count", "").strip()
+        tank_count = int(float(count_raw)) if count_raw else 1
+        if tank_count < 1:
+            tank_count = 1
 
         if not ssid or height <= 0 or diameter <= 0:
             raise ValueError("missing required field")
@@ -274,6 +283,7 @@ def _handle_full_setup_post(fields, scanned_networks):
         config["tank_height"] = height
         config["tank_diameter"] = diameter
         config["sensor_offset_cm"] = sensor_offset
+        config["tank_count"] = tank_count
         config["mqtt_client_id"] = fields.get("mqtt_client_id", "").strip()
         save_config(config)
 
@@ -322,6 +332,10 @@ def _handle_add_network_post(fields, scanned_networks):
         diameter = float(fields.get("diameter", 0))
         offset_raw = fields.get("sensor_offset", "").strip()
         sensor_offset = float(offset_raw) if offset_raw else 0.0
+        count_raw = fields.get("tank_count", "").strip()
+        tank_count = int(float(count_raw)) if count_raw else 1
+        if tank_count < 1:
+            tank_count = 1
 
         if height <= 0 or diameter <= 0:
             raise ValueError("missing required tank field")
@@ -330,6 +344,7 @@ def _handle_add_network_post(fields, scanned_networks):
         config["tank_height"] = height
         config["tank_diameter"] = diameter
         config["sensor_offset_cm"] = sensor_offset
+        config["tank_count"] = tank_count
 
         save_config(config)
 

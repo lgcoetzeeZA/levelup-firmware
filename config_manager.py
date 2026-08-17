@@ -10,6 +10,9 @@ DEFAULT_CONFIG = {
     "tank_height": 0,
     "tank_diameter": 0,
     "sensor_offset_cm": 0,     # gap between sensor and the true full/overflow line
+    "tank_count": 1,           # number of identical tanks connected in series,
+                               # sharing one water level - volume scales by this,
+                               # percentage doesn't (it's a ratio, unaffected)
     "mqtt_client_id": ""
 }
 

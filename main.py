@@ -112,11 +112,15 @@ def make_on_message(state, wdt, ota_progress, config, publish_config, publish_da
                         config["tank_diameter"] = float(cmd["diameter"])
                     if "sensor_offset" in cmd:
                         config["sensor_offset_cm"] = float(cmd["sensor_offset"])
+                    if "tank_count" in cmd:
+                        count = int(cmd["tank_count"])
+                        config["tank_count"] = count if count >= 1 else 1
                     save_config(config)
                     print("Tank settings updated via MQTT:", config)
-                    ota_progress("Tank settings updated: height={} diameter={} offset={} liters={}".format(
+                    ota_progress("Tank settings updated: height={} diameter={} offset={} liters={} count={}".format(
                         config["tank_height"], config["tank_diameter"],
-                        config["sensor_offset_cm"], config["tank_liters"]
+                        config["sensor_offset_cm"], config["tank_liters"],
+                        config.get("tank_count", 1)
                     ))
                     publish_config()
                 else:
@@ -186,6 +190,7 @@ def build_config_payload(config, client_id):
         "sensor_from_overflow_cm": config.get("sensor_offset_cm"),
         "tank_roof_cm": (config.get("tank_height") or 0) + (config.get("sensor_offset_cm") or 0),
         "tank_liters": config.get("tank_liters"),
+        "tank_count": config.get("tank_count", 1),
     }
 
 
