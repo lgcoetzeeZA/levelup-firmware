@@ -13,6 +13,8 @@ DEFAULT_CONFIG = {
     "tank_count": 1,           # number of identical tanks connected in series,
                                # sharing one water level - volume scales by this,
                                # percentage doesn't (it's a ratio, unaffected)
+    "sensor_type": "Standard", # "Standard", "AJ-SR04M", or "VL53L1X" - selected
+                               # on the setup pages, no dip switches involved
     "mqtt_client_id": ""
 }
 

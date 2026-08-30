@@ -30,15 +30,10 @@ RIGHT_BUTTON_PIN = 4
 ADD_NETWORK_HOLD_MS = 3000
 LEFT_BUTTON_PIN = 12
 OTA_BUTTON_HOLD_MS = 3000
-DIP1_PIN = 14
-DIP2_PIN = 13
 
 relay = Pin(RELAY_PIN, Pin.OUT)
 relay.value(relay_state.load_relay_state())
 print("Relay resumed to saved state:", relay.value())
-
-dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
-dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
 
 relay_button = buttons.Button(RELAY_BUTTON_PIN, Pin.PULL_DOWN)
 right_button = buttons.Button(RIGHT_BUTTON_PIN, Pin.PULL_DOWN)
@@ -168,8 +163,6 @@ def build_status_payload(wifi, reading, relay_state, config):
         "tank_diameter_cm": config.get("tank_diameter"),
         "sensor_from_overflow_cm": config.get("sensor_offset_cm"),
         "relay_status": int(relay_state),
-        "dip1": dip1.value(),
-        "dip2": dip2.value(),
         "oled_connected": display.available(),
         "version": ota_updater.get_current_version(),
         "ssid": str(wifi.config("essid")) if wifi else None,
@@ -191,6 +184,7 @@ def build_config_payload(config, client_id):
         "tank_roof_cm": (config.get("tank_height") or 0) + (config.get("sensor_offset_cm") or 0),
         "tank_liters": config.get("tank_liters"),
         "tank_count": config.get("tank_count", 1),
+        "sensor_type": config.get("sensor_type", "Standard"),
     }
 
 

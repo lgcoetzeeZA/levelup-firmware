@@ -141,6 +141,12 @@ def _render_full_setup_page(scanned_networks, error=None):
 <input type="number" step="any" name="sensor_offset" placeholder="Leave blank if sensor sits flush at the top">
 <label>Number of Tanks Connected (identical, sharing one water level)</label>
 <input type="number" step="1" min="1" name="tank_count" value="1">
+<label>Sensor Type</label>
+<select name="sensor_type">
+<option value="Standard" selected>Standard (e.g. HC-SR04)</option>
+<option value="AJ-SR04M">AJ-SR04M (waterproof ultrasonic)</option>
+<option value="VL53L1X">VL53L1X (laser time-of-flight)</option>
+</select>
 <label>MQTT Client ID (optional)</label>
 <input type="text" name="mqtt_client_id" placeholder="Leave blank for auto-generated ID">
 <button type="submit">Save &amp; Connect</button>
@@ -208,6 +214,12 @@ def _render_add_network_page(scanned_networks, existing_networks, default_ssid, 
 <input type="number" step="any" name="sensor_offset" value="{sensor_offset}">
 <label>Number of Tanks Connected (identical, sharing one water level)</label>
 <input type="number" step="1" min="1" name="tank_count" value="{tank_count}">
+<label>Sensor Type</label>
+<select name="sensor_type">
+<option value="Standard"{sel_standard}>Standard (e.g. HC-SR04)</option>
+<option value="AJ-SR04M"{sel_aj}>AJ-SR04M (waterproof ultrasonic)</option>
+<option value="VL53L1X"{sel_vl53}>VL53L1X (laser time-of-flight)</option>
+</select>
 <button type="submit">Save</button>
 </form>
 <script>
@@ -225,6 +237,9 @@ function toggleManual(){{
         diameter=config.get("tank_diameter", 0),
         sensor_offset=config.get("sensor_offset_cm", 0),
         tank_count=config.get("tank_count", 1),
+        sel_standard=" selected" if config.get("sensor_type", "Standard") == "Standard" else "",
+        sel_aj=" selected" if config.get("sensor_type") == "AJ-SR04M" else "",
+        sel_vl53=" selected" if config.get("sensor_type") == "VL53L1X" else "",
     )
 
     return _page_shell("Manage WiFi Networks", body)
@@ -258,6 +273,9 @@ def _handle_full_setup_post(fields, scanned_networks):
         tank_count = int(float(count_raw)) if count_raw else 1
         if tank_count < 1:
             tank_count = 1
+        sensor_type = fields.get("sensor_type", "Standard")
+        if sensor_type not in ("Standard", "AJ-SR04M", "VL53L1X"):
+            sensor_type = "Standard"
 
         if not ssid or height <= 0 or diameter <= 0:
             raise ValueError("missing required field")
@@ -284,6 +302,7 @@ def _handle_full_setup_post(fields, scanned_networks):
         config["tank_diameter"] = diameter
         config["sensor_offset_cm"] = sensor_offset
         config["tank_count"] = tank_count
+        config["sensor_type"] = sensor_type
         config["mqtt_client_id"] = fields.get("mqtt_client_id", "").strip()
         save_config(config)
 
@@ -336,6 +355,9 @@ def _handle_add_network_post(fields, scanned_networks):
         tank_count = int(float(count_raw)) if count_raw else 1
         if tank_count < 1:
             tank_count = 1
+        sensor_type = fields.get("sensor_type", "Standard")
+        if sensor_type not in ("Standard", "AJ-SR04M", "VL53L1X"):
+            sensor_type = "Standard"
 
         if height <= 0 or diameter <= 0:
             raise ValueError("missing required tank field")
@@ -345,6 +367,7 @@ def _handle_add_network_post(fields, scanned_networks):
         config["tank_diameter"] = diameter
         config["sensor_offset_cm"] = sensor_offset
         config["tank_count"] = tank_count
+        config["sensor_type"] = sensor_type
 
         save_config(config)
 

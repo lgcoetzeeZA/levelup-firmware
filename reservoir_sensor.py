@@ -6,9 +6,6 @@ import tank_calculator
 TRIG_PIN = 26
 ECHO_PIN = 27
 
-DIP1_PIN = 14
-DIP2_PIN = 13
-
 # Standard/previous ultrasonic sensor (e.g. HC-SR04-style) plausible range
 STANDARD_SENSOR_MIN_CM = 2
 STANDARD_SENSOR_MAX_CM = 400
@@ -16,6 +13,12 @@ STANDARD_SENSOR_MAX_CM = 400
 # AJ-SR04M (waterproof) - measured blind zone and datasheet max range
 AJ_SR04M_MIN_CM = 21
 AJ_SR04M_MAX_CM = 450
+
+# VL53L1X ToF - datasheet range is up to ~400cm on cooperative targets, but
+# water reflects far less signal than a solid surface, so this starts
+# conservative (300cm) pending real-world testing on your actual tank
+VL53L1X_MIN_CM = 4
+VL53L1X_MAX_CM = 300
 
 SAMPLE_COUNT = 5             # readings taken per measurement cycle
 SAMPLE_DELAY_MS = 20         # gap between samples within one cycle
@@ -42,36 +45,37 @@ JUMP_REJECT_GIVEUP_CYCLES = 3  # after this many consecutive rejections (~15s), 
 # for actively diagnosing sensor behavior without any layer hiding it.
 DEBUG_RAW_MODE = True
 
-_dip1 = Pin(DIP1_PIN, Pin.IN, Pin.PULL_DOWN)
-_dip2 = Pin(DIP2_PIN, Pin.IN, Pin.PULL_DOWN)
+_sensor = None
+_sensor_type_label = None
 
 
-def _select_sensor_range():
-    """Reads the dip switches once at boot to determine which sensor is
-    fitted:
-      1 ON  + 2 ON  -> AJ-SR04M (waterproof)
-      1 OFF + 2 OFF -> standard/previous sensor
-      any other combo -> falls back to the standard sensor range, since
-      1 ON + 2 OFF is reserved for arming the Left button's OTA shortcut,
-      not a sensor selection."""
-    d1 = _dip1.value()
-    d2 = _dip2.value()
-
-    if d1 == 1 and d2 == 1:
-        print("Sensor type: AJ-SR04M (waterproof) - dip switches 1+2 ON")
-        return "AJ-SR04M", AJ_SR04M_MIN_CM, AJ_SR04M_MAX_CM
-
-    if d1 == 0 and d2 == 0:
-        print("Sensor type: standard sensor - dip switches 1+2 OFF")
-        return "Standard", STANDARD_SENSOR_MIN_CM, STANDARD_SENSOR_MAX_CM
-
-    print("Dip switches don't match a defined sensor combo - defaulting to standard sensor range")
-    return "Standard", STANDARD_SENSOR_MIN_CM, STANDARD_SENSOR_MAX_CM
+def _create_sensor(sensor_type):
+    if sensor_type == "AJ-SR04M":
+        return ultrasonic_sensor.UltrasonicSensor(
+            TRIG_PIN, ECHO_PIN, timeout_us=30000,
+            min_plausible_cm=AJ_SR04M_MIN_CM, max_plausible_cm=AJ_SR04M_MAX_CM
+        )
+    if sensor_type == "VL53L1X":
+        import vl53l1x_sensor
+        return vl53l1x_sensor.ToFSensor(
+            min_plausible_cm=VL53L1X_MIN_CM, max_plausible_cm=VL53L1X_MAX_CM
+        )
+    return ultrasonic_sensor.UltrasonicSensor(
+        TRIG_PIN, ECHO_PIN, timeout_us=30000,
+        min_plausible_cm=STANDARD_SENSOR_MIN_CM, max_plausible_cm=STANDARD_SENSOR_MAX_CM
+    )
 
 
-_sensor_type_label, _min_cm, _max_cm = _select_sensor_range()
-_sensor = ultrasonic_sensor.UltrasonicSensor(TRIG_PIN, ECHO_PIN, timeout_us=30000,
-                                              min_plausible_cm=_min_cm, max_plausible_cm=_max_cm)
+def _ensure_sensor(config):
+    """Creates the sensor object on first use, based on config["sensor_type"]
+    (set via the setup pages, no dip switches involved). Only runs once per
+    boot - changing sensor_type takes effect after the next reboot, same as
+    the setup pages already trigger."""
+    global _sensor, _sensor_type_label
+    if _sensor is None:
+        _sensor_type_label = config.get("sensor_type", "Standard")
+        print("Sensor type (from config):", _sensor_type_label)
+        _sensor = _create_sensor(_sensor_type_label)
 
 _last_good_distance = None
 _last_good_level = None
@@ -130,6 +134,8 @@ def read(config):
                                if there has never been a good reading
     """
     global _last_good_distance, _last_good_level, _last_good_time, _consecutive_failures, _smoothed_distance
+
+    _ensure_sensor(config)
 
     distance = _sample_distance()
 
